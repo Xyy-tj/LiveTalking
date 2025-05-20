@@ -1,3 +1,5 @@
+.env
+.env
 __pycache__/
 build/
 *.egg-info/
@@ -19,4 +21,4 @@ workspace/log_ngp.txt
 models/
 *.log
 dist
-.env
+

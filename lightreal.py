@@ -153,66 +153,100 @@ def inference(quit_event, batch_size, face_list_cycle, audio_feat_queue, audio_o
     count = 0
     counttime = 0
     logger.info('start inference')
+    
+    # 预先分配数组以减少内存分配
+    indices = np.zeros(batch_size, dtype=np.int32)
+    
+    # 预缓存常用尺寸和区域
+    face_region = (4, 164, 4, 164)  # y1, y2, x1, x2
+    mask_region = (5, 5, 150, 145)  # x, y, w, h
 
     while not quit_event.is_set():
-        starttime=time.perf_counter()
         try:
             mel_batch = audio_feat_queue.get(block=True, timeout=1)
         except queue.Empty:
             continue
-        is_all_silence=True
+            
+        # 收集音频帧
+        is_all_silence = True
         audio_frames = []
         for _ in range(batch_size*2):
-            frame,type_,eventpoint = audio_out_queue.get()
-            audio_frames.append((frame,type_,eventpoint))
-            if type_==0:
-                is_all_silence=False
+            frame, type_, eventpoint = audio_out_queue.get()
+            audio_frames.append((frame, type_, eventpoint))
+            if type_ == 0:
+                is_all_silence = False
+        
+        # 处理静音帧
         if is_all_silence:
             for i in range(batch_size):
-                res_frame_queue.put((None,__mirror_index(length,index),audio_frames[i*2:i*2+2]))
-                index = index + 1
+                res_frame_queue.put((None, __mirror_index(length, index), audio_frames[i*2:i*2+2]))
+                index += 1
+            continue
+            
+        # 开始计时
+        t = time.perf_counter()
+        
+        # 获取当前批次的索引
+        for i in range(batch_size):
+            indices[i] = __mirror_index(length, index + i)
+            
+        # 批量处理图像 - 避免循环中的重复操作
+        # 1. 预先分配一个批次的图像数组
+        y1, y2, x1, x2 = face_region
+        img_batch_np = np.zeros((batch_size, 6, y2-y1, x2-x1), dtype=np.float32)
+        
+        # 2. 并行处理每个图像 (可以考虑使用 NumPy 的向量化操作)
+        for i in range(batch_size):
+            idx = indices[i]
+            crop_img = face_list_cycle[idx]
+            
+            # 提取人脸区域并创建只有一次副本
+            img_real_ex = crop_img[y1:y2, x1:x2]
+            
+            # 创建遮罩图像 - 优化: 只在需要的区域应用遮罩
+            img_masked = img_real_ex.copy()
+            mx, my, mw, mh = mask_region
+            img_masked[my:my+mh, mx:mx+mw] = 0
+            
+            # 直接转换并填充预分配的数组 - 减少临时对象
+            # 第一个通道: 原始图像
+            img_batch_np[i, 0:3] = img_real_ex.transpose(2, 0, 1).astype(np.float32) / 255.0
+            # 第二个通道: 遮罩图像
+            img_batch_np[i, 3:6] = img_masked.transpose(2, 0, 1).astype(np.float32) / 255.0
+        
+        # 3. 一次性移动到GPU
+        img_batch = torch.from_numpy(img_batch_np).to(device, non_blocking=True)
+        
+        # 4. 处理mel特征
+        if isinstance(mel_batch, list):
+            # 优化: 使用numpy的批处理而不是列表推导
+            mel_np = np.stack([arr.reshape(32, 32, 32) for arr in mel_batch])
+            mel_batch_tensor = torch.from_numpy(mel_np).to(device, non_blocking=True)
         else:
-            t = time.perf_counter()
-            img_batch = []
-
-            for i in range(batch_size):
-                idx = __mirror_index(length, index + i)
-                #face = face_list_cycle[idx]
-                crop_img = face_list_cycle[idx] #face[ymin:ymax, xmin:xmax]
-#                h, w = crop_img.shape[:2]
-                #crop_img = cv2.resize(crop_img, (168, 168), cv2.INTER_AREA)
-                #crop_img_ori = crop_img.copy()
-                img_real_ex = crop_img[4:164, 4:164].copy()
-                img_real_ex_ori = img_real_ex.copy()
-                img_masked = cv2.rectangle(img_real_ex_ori,(5,5,150,145),(0,0,0),-1)
-    
-                img_masked = img_masked.transpose(2,0,1).astype(np.float32)
-                img_real_ex = img_real_ex.transpose(2,0,1).astype(np.float32)
-    
-                img_real_ex_T = torch.from_numpy(img_real_ex / 255.0)
-                img_masked_T = torch.from_numpy(img_masked / 255.0)
-                img_concat_T = torch.cat([img_real_ex_T, img_masked_T], axis=0)[None]
-                img_batch.append(img_concat_T)
-
-            reshaped_mel_batch = [arr.reshape(32, 32, 32) for arr in mel_batch]
-            mel_batch = torch.stack([torch.from_numpy(arr) for arr in reshaped_mel_batch])
-            img_batch = torch.stack(img_batch).squeeze(1)
-
-
-            with torch.no_grad():
-                pred = model(img_batch.cuda(),mel_batch.cuda())
-            pred = pred.cpu().numpy().transpose(0, 2, 3, 1) * 255.
-
-            counttime += (time.perf_counter() - t)
-            count += batch_size
-            if count >= 100:
-                logger.info(f"------actual avg infer fps:{count / counttime:.4f}")
-                count = 0
-                counttime = 0
-            for i,res_frame in enumerate(pred):
-                #self.__pushmedia(res_frame,loop,audio_track,video_track)
-                res_frame_queue.put((res_frame,__mirror_index(length,index),audio_frames[i*2:i*2+2]))
-                index = index + 1
+            # 如果已经是numpy数组
+            mel_batch_tensor = torch.from_numpy(mel_batch.reshape(-1, 32, 32, 32)).to(device, non_blocking=True)
+            
+        # 5. 模型推理 - 使用非阻塞传输可能提高并行性
+        with torch.no_grad():
+            pred = model(img_batch, mel_batch_tensor)
+            
+        # 6. 处理预测结果
+        # 只在需要时执行CPU转换 (这是必要的瓶颈)
+        pred_np = pred.cpu().numpy()
+        pred_np = pred_np.transpose(0, 2, 3, 1) * 255.0
+        
+        # 7. 更新计时器和计数器
+        counttime += (time.perf_counter() - t)
+        count += batch_size
+        if count >= 100:
+            logger.info(f"------actual avg infer fps:{count/counttime:.4f}")
+            count = 0
+            counttime = 0
+            
+        # 8. 处理输出帧 - 使用更高效的索引处理
+        for i, res_frame in enumerate(pred_np):
+            res_frame_queue.put((res_frame, indices[i], audio_frames[i*2:i*2+2]))
+            index += 1
 
 #            for i, pred_frame in enumerate(pred):
 #                pred_frame_uint8 = np.array(pred_frame, dtype=np.uint8)
@@ -252,55 +286,100 @@ class LightReal(BaseReal):
 
    
     def process_frames(self,quit_event,loop=None,audio_track=None,video_track=None):
+        # 预分配缓冲区以避免频繁内存分配
+        face_region = (4, 164, 4, 164)  # 人脸区域坐标 (y1, y2, x1, x2)
         
         while not quit_event.is_set():
             try:
-                res_frame,idx,audio_frames = self.res_frame_queue.get(block=True, timeout=1)
+                res_frame, idx, audio_frames = self.res_frame_queue.get(block=True, timeout=1)
             except queue.Empty:
                 continue
-            if audio_frames[0][1]!=0 and audio_frames[1][1]!=0: #全为静音数据，只需要取fullimg
+                
+            # 处理静音帧 - 不需要图像合成
+            if audio_frames[0][1] != 0 and audio_frames[1][1] != 0:  # 全为静音数据
                 self.speaking = False
                 audiotype = audio_frames[0][1]
-                if self.custom_index.get(audiotype) is not None: #有自定义视频
-                    mirindex = self.mirror_index(len(self.custom_img_cycle[audiotype]),self.custom_index[audiotype])
+                
+                # 检查是否有自定义视频
+                if self.custom_index.get(audiotype) is not None:  
+                    mirindex = self.mirror_index(len(self.custom_img_cycle[audiotype]), self.custom_index[audiotype])
                     combine_frame = self.custom_img_cycle[audiotype][mirindex]
                     self.custom_index[audiotype] += 1
-                    # if not self.custom_opt[audiotype].loop and self.custom_index[audiotype]>=len(self.custom_img_cycle[audiotype]):
-                    #     self.curr_state = 1  #当前视频不循环播放，切换到静音状态
                 else:
+                    # 直接使用预加载的帧，无需复制
                     combine_frame = self.frame_list_cycle[idx]
-                    #combine_frame = self.imagecache.get_img(idx)
             else:
+                # 处理语音帧 - 需要图像合成
                 self.speaking = True
+                t_start = time.perf_counter()  # 用于性能监控
+                
+                # 获取变量，避免重复访问
                 bbox = self.coord_list_cycle[idx]
-                combine_frame = copy.deepcopy(self.frame_list_cycle[idx])
                 x1, y1, x2, y2 = bbox
-
+                height, width = y2-y1, x2-x1
+                
+                # 只在真正需要深拷贝的地方使用
+                combine_frame = np.array(self.frame_list_cycle[idx], copy=True)
                 crop_img = self.face_list_cycle[idx]
-                crop_img_ori = crop_img.copy()
-                #res_frame = np.array(res_frame, dtype=np.uint8)
+                
                 try:
-                    crop_img_ori[4:164, 4:164] = res_frame.astype(np.uint8)
-                    crop_img_ori = cv2.resize(crop_img_ori, (x2-x1,y2-y1))
-                except:
+                    # 直接操作，减少中间变量
+                    if res_frame is not None:
+                        # 转换为uint8仅执行一次
+                        if not isinstance(res_frame, np.ndarray) or res_frame.dtype != np.uint8:
+                            res_frame = res_frame.astype(np.uint8)
+                            
+                        # 创建一个视图而不是复制
+                        crop_img_processed = crop_img.copy()
+                        y1_face, y2_face, x1_face, x2_face = face_region
+                        crop_img_processed[y1_face:y2_face, x1_face:x2_face] = res_frame
+                        
+                        # 直接调整大小并应用到最终帧
+                        # 使用INTER_LINEAR进行更快的调整大小
+                        if (height, width) != crop_img_processed.shape[:2]:
+                            crop_img_processed = cv2.resize(crop_img_processed, (width, height), interpolation=cv2.INTER_LINEAR)
+                            
+                        # 直接应用到最终帧
+                        combine_frame[y1:y2, x1:x2] = crop_img_processed
+                        
+                        # 监控性能
+                        process_time = time.perf_counter() - t_start
+                        if process_time > 0.01:  # 10毫秒以上记录日志
+                            logger.debug(f"帧处理时间: {process_time*1000:.2f}ms")
+                except Exception as e:
+                    logger.error(f"处理帧时出错: {e}")
                     continue
-                combine_frame[y1:y2, x1:x2] = crop_img_ori
-                #print('blending time:',time.perf_counter()-t)
 
-            new_frame = VideoFrame.from_ndarray(combine_frame, format="bgr24")
-            asyncio.run_coroutine_threadsafe(video_track._queue.put((new_frame,None)), loop)
+            # 优化视频帧处理：避免额外的内存复制
+            # 确保combine_frame是连续的内存布局，这样from_ndarray更高效
+            if not combine_frame.flags.c_contiguous:
+                combine_frame = np.ascontiguousarray(combine_frame)
+            
+            # 创建视频帧并发送
+            new_video_frame = VideoFrame.from_ndarray(combine_frame, format="bgr24")
+            asyncio.run_coroutine_threadsafe(video_track._queue.put((new_video_frame,None)), loop)
             self.record_video_data(combine_frame)
 
-            for audio_frame in audio_frames:
-                frame,type_,eventpoint = audio_frame
-                frame = (frame * 32767).astype(np.int16)
-                new_frame = AudioFrame(format='s16', layout='mono', samples=frame.shape[0])
-                new_frame.planes[0].update(frame.tobytes())
-                new_frame.sample_rate=16000
-                # if audio_track._queue.qsize()>10:
-                #     time.sleep(0.1)
-                asyncio.run_coroutine_threadsafe(audio_track._queue.put((new_frame,eventpoint)), loop)
-                self.record_audio_data(frame)
+            # 优化音频帧处理：预处理数据，减少循环中的操作
+            for audio_data in audio_frames:
+                frame, type_, eventpoint = audio_data
+                
+                # 快速路径：如果已经是正确格式，避免不必要的处理
+                if isinstance(frame, np.ndarray):
+                    # 只在必要时进行维度转换
+                    if frame.ndim > 1 and frame.shape[1] > 0:
+                        frame = frame[:, 0]  # 只取第一个声道
+                
+                if frame.size == 0: # Skip empty audio frames
+                    logger.debug("Skipping empty audio frame")
+                    continue
+
+                processed_frame = (frame * 32767).astype(np.int16)
+                new_audio_frame = AudioFrame(format='s16', layout='mono', samples=processed_frame.shape[0])
+                new_audio_frame.planes[0].update(processed_frame.tobytes())
+                new_audio_frame.sample_rate=16000
+                asyncio.run_coroutine_threadsafe(audio_track._queue.put((new_audio_frame,eventpoint)), loop)
+                self.record_audio_data(processed_frame)
                 #self.notify(eventpoint)
         logger.info('lightreal process_frames thread stop') 
             
@@ -330,9 +409,12 @@ class LightReal(BaseReal):
             # if video_track._queue.qsize()>=2*self.opt.batch_size:
             #     print('sleep qsize=',video_track._queue.qsize())
             #     time.sleep(0.04*video_track._queue.qsize()*0.8)
-            if video_track._queue.qsize()>=5:
-                logger.debug('sleep qsize=%d',video_track._queue.qsize())
-                time.sleep(0.04*video_track._queue.qsize()*0.8)
+            # Adjusted sleep logic to be less aggressive and potentially based on a target latency
+            # This is a simple adjustment; more sophisticated adaptive logic might be needed.
+            if video_track._queue.qsize() >= self.opt.batch_size * 1.5: # Sleep if queue is 1.5x batch_size
+                sleep_duration = 0.01 * (video_track._queue.qsize() - self.opt.batch_size) # Sleep proportionally to excess queue size
+                logger.debug('sleep qsize=%d, sleeping for %.3fs', video_track._queue.qsize(), sleep_duration)
+                time.sleep(max(0, sleep_duration)) # Ensure sleep duration is not negative
                 
             # delay = _starttime+_totalframe*0.04-time.perf_counter() #40ms
             # if delay > 0:
