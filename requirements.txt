@@ -43,3 +43,4 @@ accelerate
 librosa
 openai
 dashscope
+dotenv

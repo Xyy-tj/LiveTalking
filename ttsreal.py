@@ -31,6 +31,10 @@ from queue import Queue
 from io import BytesIO
 from threading import Thread, Event
 from enum import Enum
+import os
+import dotenv
+
+dotenv.load_dotenv()
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -471,7 +475,7 @@ class DashScopeTTS(BaseTTS):
         import dashscope
         
         # 恢复使用固定API密钥和模型配置
-        dashscope.api_key = "sk-541b710c10f4476a8405f211ba8b89c4"
+        dashscope.api_key = os.getenv("DASHSCOPE_API_KEY")
         
         self.current_text = None
         self.current_event = None
@@ -551,7 +555,7 @@ class DashScopeTTS(BaseTTS):
             self.first_chunk = True
             synthesizer = SpeechSynthesizer(
                 model="cosyvoice-v2",
-                voice = "cosyvoice-v2-prefix-f7b6006a6386487eb959dffb042a34cf",
+                voice = os.getenv("DASHSCOPE_VOICE_ID"),
                 format=AudioFormat.PCM_22050HZ_MONO_16BIT,
                 callback=self._create_callback()
             )
@@ -594,7 +598,7 @@ class DashScopeStreamTTS(BaseTTS):
         # from dashscope.audio.tts_v2 import SpeechSynthesizer, AudioFormat, ResultCallback # Moved to methods
         
         # 设置API Key
-        dashscope.api_key = opt.api_key if hasattr(opt, 'api_key') else "sk-541b710c10f4476a8405f211ba8b89c4"
+        dashscope.api_key = opt.api_key if hasattr(opt, 'api_key') else os.getenv("DASHSCOPE_API_KEY")
         
         self.opt = opt
         self.synthesizer = None # Will be initialized in txt_to_audio
@@ -608,7 +612,7 @@ class DashScopeStreamTTS(BaseTTS):
         # 每个 synthesizer 实例获取一个新的回调实例
         self.synthesizer = SpeechSynthesizer(
             model=self.opt.model if hasattr(self.opt, 'model') else "cosyvoice-v2",
-            voice=self.opt.voice_name if hasattr(self.opt, 'voice_name') else "cosyvoice-v2-prefix-f7b6006a6386487eb959dffb042a34cf",
+            voice=self.opt.voice_name if hasattr(self.opt, 'voice_name') else os.getenv("DASHSCOPE_VOICE_ID"),
             format=AudioFormat.PCM_22050HZ_MONO_16BIT,
             callback=self._create_callback() 
         )

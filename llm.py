@@ -2,15 +2,18 @@ import time
 import os
 from basereal import BaseReal
 from logger import logger
+import dotenv
+
+dotenv.load_dotenv()
 
 def llm_response(message,nerfreal:BaseReal):
     start = time.perf_counter()
     from openai import OpenAI
     client = OpenAI(
         # 如果您没有配置环境变量，请在此处用您的API Key进行替换
-        api_key="sk-6nCj8SHwe8nCvKG97f07608a10824dB6B8380d4525D90458",
-        # 填写DashScope SDK的base_url
-        base_url="https://api.catflows.com/v1",
+        api_key=os.getenv("OPENAI_API_KEY"),
+        #base_url
+        base_url=os.getenv("OPENAI_BASE_URL")
     )
     end = time.perf_counter()
     logger.info(f"llm Time init: {end-start}s")
