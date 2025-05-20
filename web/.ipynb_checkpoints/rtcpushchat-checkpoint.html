@@ -76,7 +76,7 @@
       fetch('/human', {
             body: JSON.stringify({
                 text: message,
-                type: 'echo',
+                type: 'chat',
             }),
             headers: {
                 'Content-Type': 'application/json'
@@ -105,9 +105,10 @@
         // Optional callback, SDK will add track to stream.
         // sdk.ontrack = function (event) { console.log('Got track', event); sdk.stream.addTrack(event.track); };
 
-        var host = window.location.hostname
+        // var host = window.location.hostname
+        var host = "124.223.167.54"
         // For example: webrtc://r.ossrs.net/live/livestream
-        var url = "http://124.223.167.54:1985/rtc/v1/whep/?app=live&stream=livestream"
+        var url = "http://"+host+":1985/rtc/v1/whep/?app=live&stream=livestream"
         sdk.play(url).then(function(session){
             //$('#sessionid').html(session.sessionid);
             //$('#simulator-drop').attr('href', session.simulator + '?drop=1&username=' + session.sessionid);

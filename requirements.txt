@@ -1,4 +1,5 @@
 torch-ema
+torchvision
 ninja
 trimesh
 opencv-python
@@ -19,7 +20,7 @@ python_speech_features
 numba
 resampy
 #pyaudio
-soundfile==0.12.1
+soundfile
 einops
 configargparse
 
@@ -41,3 +42,4 @@ accelerate
 
 librosa
 openai
+dashscope

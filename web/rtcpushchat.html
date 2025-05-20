@@ -3,77 +3,223 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebRTC webcam</title>
+    <title>WebRTC 视频聊天</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: 'Inter', sans-serif;
+    }
+
+    body {
+        background-color: #f5f7fa;
+        color: #2d3748;
+        line-height: 1.6;
+        padding: 2rem;
+    }
+
+    .container {
+        max-width: 1280px;
+        margin: 0 auto;
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        gap: 2rem;
+    }
+
+    .header {
+        grid-column: 1 / -1;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+
+    .header h1 {
+        color: #1a202c;
+        margin-bottom: 1rem;
+    }
+
+    .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1.5rem;
+        background: #f8fafc;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+
     button {
-        padding: 8px 16px;
+        padding: 10px 20px;
+        background-color: #4299e1;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background-color 0.2s;
+    }
+
+    button:hover {
+        background-color: #3182ce;
+    }
+
+    .option {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: white;
+        border-radius: 6px;
+    }
+
+    .option input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+    }
+
+    #media {
+        margin-top: 0;
+        display: flex;
+        flex-direction: column;
     }
 
     video {
         width: 100%;
+        aspect-ratio: 16/9;
+        object-fit: contain;
+        border-radius: 8px;
+        background: #000;
     }
 
-    .option {
-        margin-bottom: 8px;
+    .right-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
     }
 
-    #media {
-        max-width: 1280px;
+    .chat-form {
+        margin-top: 0;
+        padding: 1.5rem;
+        background: #f8fafc;
+        border-radius: 8px;
+        height: fit-content;
+    }
+
+    .chat-form p {
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+
+    textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        resize: none;
+        font-size: 14px;
+        margin-bottom: 1rem;
+        height: 120px;
+    }
+
+    textarea:focus {
+        outline: none;
+        border-color: #4299e1;
+        box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+    }
+
+    .status {
+        margin-top: 1rem;
+        padding: 0.5rem;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .status.connected {
+        background-color: #c6f6d5;
+        color: #2f855a;
+    }
+
+    .status.disconnected {
+        background-color: #fed7d7;
+        color: #c53030;
+    }
+
+    .voice-select {
+        padding: 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        background: white;
+        font-size: 14px;
+        width: 100%;
+    }
+
+    .voice-select:focus {
+        outline: none;
+        border-color: #4299e1;
+        box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+    }
+
+    @media (max-width: 1024px) {
+        .container {
+            grid-template-columns: 1fr;
+        }
+        
+        .right-panel {
+            order: -1;
+        }
     }
     </style>
 </head>
 <body>
+    <div class="container">
+        <div class="header">
+            <h1>WebRTC 视频聊天</h1>
+        </div>
 
-<div class="option">
-    <input id="use-stun" type="checkbox"/>
-    <label for="use-stun">Use STUN server</label>
-</div>
-<button class="btn btn-primary" id="btn_play">Start</button>
-<form class="form-inline" id="echo-form">
-    <div class="form-group">
-      <p>input text</p>
+        <div id="media">
+            <video id="rtc_media_player" controls autoplay></video>
+        </div>
 
-      <textarea cols="2" rows="3" style="width:600px;height:50px;" class="form-control" id="message">test</textarea>
+        <div class="right-panel">
+            <div class="controls">
+                <div class="option">
+                    <input id="use-stun" type="checkbox"/>
+                    <label for="use-stun">使用 STUN 服务器</label>
+                </div>
+                <select id="voice-select" class="voice-select">
+                    <option value="zh-CN-XiaoxiaoNeural">小筱 - 活泼可爱</option>
+                    <option value="zh-CN-YunxiNeural">云希 - 年轻活力</option>
+                    <option value="zh-CN-XiaoyiNeural">小艺 - 温柔甜美</option>
+                    <option value="zh-CN-YunyangNeural">云扬 - 成熟稳重</option>
+                    <option value="zh-CN-XiaochenNeural">小陈 - 清新自然</option>
+                </select>
+                <button class="btn btn-primary" id="btn_play">开始视频</button>
+            </div>
+
+            <form class="chat-form" id="echo-form">
+                <p>发送消息</p>
+                <textarea id="message" placeholder="输入您想发送的消息...">test</textarea>
+                <button type="submit">发送</button>
+            </form>
+        </div>
     </div>
-    <button type="submit" class="btn btn-default">Send</button>
-  </form>
 
-<div id="media">
-    <h2>Media</h2>
-
-    <video id="rtc_media_player" style="width:600px;" controls autoplay></video>
-</div>
-
-<script src="srs.sdk.js"></script>
-<script type="text/javascript" src="http://cdn.sockjs.org/sockjs-0.3.4.js"></script>
-<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script src="srs.sdk.js"></script>
+    <script type="text/javascript" src="http://cdn.sockjs.org/sockjs-0.3.4.js"></script>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
 </body>
 <script type="text/javascript" charset="utf-8">
-
-	$(document).ready(function() {
-	  // var host = window.location.hostname
-	  // var ws = new WebSocket("ws://"+host+":8000/humanecho");
-	  // //document.getElementsByTagName("video")[0].setAttribute("src", aa["video"]);
-	  // ws.onopen = function() {
-		// console.log('Connected');
-	  // };
-	  // ws.onmessage = function(e) {
-		// console.log('Received: ' + e.data);
-		// data = e
-		// var vid = JSON.parse(data.data); 
-		// console.log(typeof(vid),vid)
-		// //document.getElementsByTagName("video")[0].setAttribute("src", vid["video"]);
-		
-	  // };
-	  // ws.onclose = function(e) {
-		// console.log('Closed');
-	  // };
-
-	  $('#echo-form').on('submit', function(e) {
-      e.preventDefault();
-      var message = $('#message').val();
-      console.log('Sending: ' + message);
-      fetch('/human', {
+$(document).ready(function() {
+    $('#echo-form').on('submit', function(e) {
+        e.preventDefault();
+        var message = $('#message').val();
+        console.log('Sending: ' + message);
+        fetch('/human', {
             body: JSON.stringify({
                 text: message,
                 type: 'chat',
@@ -82,54 +228,52 @@
                 'Content-Type': 'application/json'
             },
             method: 'POST'
-      });
-      //ws.send(message);
-      $('#message').val('');
-	  });
-	});
-
-  $(function(){
-    var sdk = null; // Global handler to do cleanup when republishing.
-    var startPlay = function() {
-        $('#rtc_media_player').show();
-
-        // Close PC when user replay.
-        if (sdk) {
-            sdk.close();
-        }
-        sdk = new SrsRtcWhipWhepAsync();
-
-        // User should set the stream when publish is done, @see https://webrtc.org/getting-started/media-devices
-        // However SRS SDK provides a consist API like https://webrtc.org/getting-started/remote-streams
-        $('#rtc_media_player').prop('srcObject', sdk.stream);
-        // Optional callback, SDK will add track to stream.
-        // sdk.ontrack = function (event) { console.log('Got track', event); sdk.stream.addTrack(event.track); };
-
-        var host = window.location.hostname
-        // For example: webrtc://r.ossrs.net/live/livestream
-        var url = "http://"+host+":1985/rtc/v1/whep/?app=live&stream=livestream"
-        sdk.play(url).then(function(session){
-            //$('#sessionid').html(session.sessionid);
-            //$('#simulator-drop').attr('href', session.simulator + '?drop=1&username=' + session.sessionid);
-        }).catch(function (reason) {
-            sdk.close();
-            $('#rtc_media_player').hide();
-            console.error(reason);
         });
-    };
+        $('#message').val('');
+    });
 
-    $('#rtc_media_player').hide();
-    // var query = parse_query_string();
-    // srs_init_whep("#txt_url", query);
+    // 音色选择变更处理
+    $('#voice-select').on('change', function() {
+        var voice = $(this).val();
+        fetch('/set_voice', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                voice: voice
+            })
+        });
+    });
 
-    $("#btn_play").click(startPlay);
-    // Never play util windows loaded @see https://github.com/ossrs/srs/issues/2732
-    // if (query.autostart === 'true') {
-    //     $('#rtc_media_player').prop('muted', true);
-    //     console.warn('For autostart, we should mute it, see https://www.jianshu.com/p/c3c6944eed5a ' +
-    //         'or https://developers.google.com/web/updates/2017/09/autoplay-policy-changes#audiovideo_elements');
-    //     window.addEventListener("load", function(){ startPlay(); });
-    // }
+    $(function(){
+        var sdk = null; // Global handler to do cleanup when republishing.
+        var startPlay = function() {
+            $('#rtc_media_player').show();
+
+            // Close PC when user replay.
+            if (sdk) {
+                sdk.close();
+            }
+            sdk = new SrsRtcWhipWhepAsync();
+
+            // User should set the stream when publish is done
+            $('#rtc_media_player').prop('srcObject', sdk.stream);
+
+            var host = "124.223.167.54"
+            var url = "http://"+host+":1985/rtc/v1/whep/?app=live&stream=livestream"
+            sdk.play(url).then(function(session){
+                // Success callback
+            }).catch(function (reason) {
+                sdk.close();
+                $('#rtc_media_player').hide();
+                console.error(reason);
+            });
+        };
+
+        $('#rtc_media_player').hide();
+        $("#btn_play").click(startPlay);
+    });
 });
 </script>
 </html>

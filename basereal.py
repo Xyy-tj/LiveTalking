@@ -35,10 +35,12 @@ import soundfile as sf
 import av
 from fractions import Fraction
 
-from ttsreal import EdgeTTS,SovitsTTS,XTTS,CosyVoiceTTS,FishTTS,TencentTTS
+from ttsreal import EdgeTTS,VoitsTTS,XTTS,CosyVoiceTTS,FishTTS,DashScopeTTS
 from logger import logger
 
 from tqdm import tqdm
+import threading
+
 def read_imgs(img_list):
     frames = []
     logger.info('reading images...')
@@ -54,18 +56,23 @@ class BaseReal:
         self.chunk = self.sample_rate // opt.fps # 320 samples per chunk (20ms * 16000 / 1000)
         self.sessionid = self.opt.sessionid
 
+        # 添加图片缓存
+        self.image_cache = {}
+        self.cache_size = 1000  # 最大缓存数量
+        self.cache_lock = threading.Lock()
+
         if opt.tts == "edgetts":
             self.tts = EdgeTTS(opt,self)
         elif opt.tts == "gpt-sovits":
-            self.tts = SovitsTTS(opt,self)
+            self.tts = VoitsTTS(opt,self)
         elif opt.tts == "xtts":
             self.tts = XTTS(opt,self)
         elif opt.tts == "cosyvoice":
             self.tts = CosyVoiceTTS(opt,self)
         elif opt.tts == "fishtts":
             self.tts = FishTTS(opt,self)
-        elif opt.tts == "tencent":
-            self.tts = TencentTTS(opt,self)
+        elif opt.tts == "dashscope":
+            self.tts = DashScopeTTS(opt,self)
         
         self.speaking = False
 
@@ -262,8 +269,8 @@ class BaseReal:
             self.curr_state = 1  #当前视频不循环播放，切换到静音状态
         return stream
     
-    def set_custom_state(self,audiotype, reinit=True):
-        print('set_custom_state:',audiotype)
+    def set_curr_state(self,audiotype, reinit):
+        print('set_curr_state:',audiotype)
         self.curr_state = audiotype
         if reinit:
             self.custom_audio_index[audiotype] = 0
@@ -276,3 +283,34 @@ class BaseReal:
     #             self.custom_index=0
     #     else:
     #         self.custom_index+=1
+
+    def get_cached_image(self, image_path):
+        """获取缓存的图片，如果不存在则加载并缓存"""
+        with self.cache_lock:
+            if image_path in self.image_cache:
+                return self.image_cache[image_path]
+            
+            # 如果缓存已满，删除最早的缓存
+            if len(self.image_cache) >= self.cache_size:
+                oldest_key = next(iter(self.image_cache))
+                del self.image_cache[oldest_key]
+            
+            # 加载新图片并缓存
+            try:
+                image = cv2.imread(image_path)
+                if image is not None:
+                    self.image_cache[image_path] = image
+                    return image
+            except Exception as e:
+                logger.error(f"Error loading image {image_path}: {e}")
+            return None
+
+    def clear_image_cache(self):
+        """清除图片缓存"""
+        with self.cache_lock:
+            self.image_cache.clear()
+
+    def preload_images(self, image_paths):
+        """预加载一批图片到缓存"""
+        for path in image_paths:
+            self.get_cached_image(path)

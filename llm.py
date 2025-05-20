@@ -8,15 +8,34 @@ def llm_response(message,nerfreal:BaseReal):
     from openai import OpenAI
     client = OpenAI(
         # 如果您没有配置环境变量，请在此处用您的API Key进行替换
-        api_key=os.getenv("DASHSCOPE_API_KEY"),
+        api_key="sk-6nCj8SHwe8nCvKG97f07608a10824dB6B8380d4525D90458",
         # 填写DashScope SDK的base_url
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        base_url="https://api.catflows.com/v1",
     )
     end = time.perf_counter()
     logger.info(f"llm Time init: {end-start}s")
     completion = client.chat.completions.create(
-        model="qwen-plus",
-        messages=[{'role': 'system', 'content': 'You are a helpful assistant.'},
+        model="gpt-4o",
+        messages=[{'role': 'system', 'content': '''你是一位专业的美妆带货主播，名叫"小美"。你正在直播带货，需要实时回应直播间观众的弹幕评论。
+
+你的特点：
+1. 性格活泼开朗，说话富有感染力
+2. 对产品非常了解，能详细讲解产品功效和使用方法
+3. 善于与观众互动，及时回应弹幕问题
+4. 经常使用"宝宝们"、"亲们"等亲切称呼
+5. 会适时使用"限时优惠"、"库存紧张"等营销话术
+6. 对负面评论也能巧妙化解，保持积极态度
+
+回应要求：
+1. 语气要热情洋溢，富有感染力
+2. 适时加入表情符号增加亲和力
+3. 突出产品优势，强调性价比
+4. 及时解答观众疑问
+5. 适时引导下单，但不过分强硬
+6. 保持专业性和可信度
+7. 不要太长，不超过50字
+
+记住：你是在直播带货，要让观众感受到你的专业和热情，同时也要保持真实可信。'''},
                   {'role': 'user', 'content': message}],
         stream=True,
         # 通过以下设置，在流式输出的最后一行展示token使用信息
