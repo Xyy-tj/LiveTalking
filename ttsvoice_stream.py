@@ -19,6 +19,11 @@ model = "cosyvoice-v2"
 # 音色
 voice = "cosyvoice-v2-prefix-f7b6006a6386487eb959dffb042a34cf"
 
+# # 创建语音注册服务实例
+# service = VoiceEnrollmentService()
+# service.update_voice(voice_id=voice_id, url=url)
+# print("request id为：", service.get_last_request_id())
+# voice = service.get_voice(voice_id=voice_id)
 
 # 定义回调接口
 class Callback(ResultCallback):
@@ -29,7 +34,7 @@ class Callback(ResultCallback):
         print("连接建立：" + get_timestamp())
         self._player = pyaudio.PyAudio()
         self._stream = self._player.open(
-            format=pyaudio.paInt16, channels=1, rate=22050, output=True
+            format=pyaudio.paInt16, channels=1, rate=16000, output=True
         )
 
     def on_complete(self):
@@ -68,7 +73,7 @@ test_text = [
 synthesizer = SpeechSynthesizer(
     model=model,
     voice=voice,
-    format=AudioFormat.PCM_22050HZ_MONO_16BIT,  
+    format=AudioFormat.WAV_16000HZ_MONO_16BIT,  
     callback=callback,
 )
 

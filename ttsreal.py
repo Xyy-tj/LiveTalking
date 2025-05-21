@@ -519,7 +519,7 @@ class DashScopeTTS(BaseTTS):
                     # 将音频数据转换为numpy数组
                     stream = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32767
                     # 重采样到目标采样率
-                    stream = resampy.resample(x=stream, sr_orig=22050, sr_new=self.parent.sample_rate)
+                    stream = resampy.resample(x=stream, sr_orig=16000, sr_new=self.parent.sample_rate)
                     
                     streamlen = stream.shape[0]
                     idx = 0
@@ -556,7 +556,7 @@ class DashScopeTTS(BaseTTS):
             synthesizer = SpeechSynthesizer(
                 model="cosyvoice-v2",
                 voice = os.getenv("DASHSCOPE_VOICE_ID"),
-                format=AudioFormat.PCM_22050HZ_MONO_16BIT,
+                format=AudioFormat.WAV_16000HZ_MONO_16BIT,
                 callback=self._create_callback()
             )
             # 流式发送文本
@@ -574,157 +574,7 @@ class DashScopeTTS(BaseTTS):
         for chunk in audio_stream:
             if chunk is not None and len(chunk)>0:          
                 stream = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32767
-                stream = resampy.resample(x=stream, sr_orig=22050, sr_new=self.sample_rate)
-                #byte_stream=BytesIO(buffer)
-                #stream = self.__create_bytes_stream(byte_stream)
-                streamlen = stream.shape[0]
-                idx=0
-                while streamlen >= self.chunk:
-                    eventpoint=None
-                    if first:
-                        eventpoint={'status':'start','text':text,'msgenvent':textevent}
-                        first = False
-                    self.parent.put_audio_frame(stream[idx:idx+self.chunk],eventpoint)
-                    streamlen -= self.chunk
-                    idx += self.chunk
-        eventpoint={'status':'end','text':text,'msgenvent':textevent}
-        self.parent.put_audio_frame(np.zeros(self.chunk,np.float32),eventpoint)  
-
-###########################################################################################
-class DashScopeStreamTTS(BaseTTS):
-    def __init__(self, opt, parent:BaseReal):
-        super().__init__(opt, parent)
-        import dashscope
-        # from dashscope.audio.tts_v2 import SpeechSynthesizer, AudioFormat, ResultCallback # Moved to methods
-        
-        # 设置API Key
-        dashscope.api_key = opt.api_key if hasattr(opt, 'api_key') else os.getenv("DASHSCOPE_API_KEY")
-        
-        self.opt = opt
-        self.synthesizer = None # Will be initialized in txt_to_audio
-        self.current_text = None
-        self.current_event = None
-        self.first_chunk = True
-        # self.is_processing = False # No longer strictly needed with per-call synthesizer
-
-    def _init_synthesizer(self):
-        from dashscope.audio.tts_v2 import SpeechSynthesizer, AudioFormat
-        # 每个 synthesizer 实例获取一个新的回调实例
-        self.synthesizer = SpeechSynthesizer(
-            model=self.opt.model if hasattr(self.opt, 'model') else "cosyvoice-v2",
-            voice=self.opt.voice_name if hasattr(self.opt, 'voice_name') else os.getenv("DASHSCOPE_VOICE_ID"),
-            format=AudioFormat.PCM_22050HZ_MONO_16BIT,
-            callback=self._create_callback() 
-        )
-        logger.info("DashScope TTS synthesizer initialized/re-initialized.")
-
-    def _create_callback(self):
-        from dashscope.audio.tts_v2 import ResultCallback
-        
-        # TTSCallback 现在与特定的 DashScopeStreamTTS 实例关联
-        class TTSCallback(ResultCallback):
-            def __init__(self, parent_tts_instance: DashScopeStreamTTS):
-                self.parent_tts = parent_tts_instance
-                
-            def on_open(self):
-                logger.info("DashScope TTS connection established")
-                
-            def on_complete(self):
-                # 使用 self.parent_tts 访问外部类成员
-                logger.info("DashScope TTS synthesis completed for text: %s", self.parent_tts.current_text)
-                if self.parent_tts.current_text is not None: # 确保 current_text 不是 None
-                    eventpoint = {
-                        'status': 'end',
-                        'text': self.parent_tts.current_text,
-                        'msgenvent': self.parent_tts.current_event
-                    }
-                    self.parent_tts.parent.put_audio_frame(
-                        np.zeros(self.parent_tts.chunk, np.float32),
-                        eventpoint
-                    )
-                # self.parent_tts.is_processing = False # No longer strictly needed
-                # REMOVED: self.parent_tts._init_synthesizer()
-                
-            def on_error(self, message: str):
-                logger.error(f"DashScope TTS error: {message} for text: {self.parent_tts.current_text}")
-                # self.parent_tts.is_processing = False # No longer strictly needed
-                # REMOVED: self.parent_tts._init_synthesizer()
-                
-            def on_close(self):
-                logger.info("DashScope TTS connection closed for text: %s", self.parent_tts.current_text)
-                # self.parent_tts.is_processing = False # No longer strictly needed
-                # REMOVED: self.parent_tts._init_synthesizer()
-                
-            def on_data(self, data: bytes) -> None:
-                if not data or len(data) == 0:
-                    return
-                    
-                try:
-                    stream = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32767
-                    stream = resampy.resample(x=stream, sr_orig=22050, sr_new=self.parent_tts.sample_rate)
-                    
-                    streamlen = stream.shape[0]
-                    idx = 0
-                    
-                    while streamlen >= self.parent_tts.chunk and self.parent_tts.state == State.RUNNING:
-                        eventpoint = None
-                        if self.parent_tts.first_chunk:
-                            eventpoint = {
-                                'status': 'start',
-                                'text': self.parent_tts.current_text,
-                                'msgenvent': self.parent_tts.current_event
-                            }
-                            self.parent_tts.first_chunk = False # This is correctly scoped per call
-                            
-                        self.parent_tts.parent.put_audio_frame(stream[idx:idx+self.parent_tts.chunk], eventpoint)
-                        streamlen -= self.parent_tts.chunk
-                        idx += self.parent_tts.chunk
-                        
-                except Exception as e:
-                    logger.error(f"Error processing audio chunk: {str(e)}")
-                    
-        return TTSCallback(self) # 传递当前的 DashScopeStreamTTS 实例
-
-    def txt_to_audio(self, msg):
-        if not msg or not isinstance(msg, tuple) or len(msg) != 2:
-            logger.error("Invalid message format for DashScopeStreamTTS")
-            return
-            
-        text, textevent = msg
-        if not isinstance(text, str): # 确保 text 是字符串
-            logger.error(f"Invalid text input for DashScopeStreamTTS: type {type(text)}, value {text}")
-            return
-        if not text: # 确保 text 非空
-             logger.warning("Empty text input for DashScopeStreamTTS")
-             # 可以选择直接返回，或者让SDK处理空字符串（如果它支持）
-             # 为避免潜在问题，这里直接返回
-             return
-            
-        try:
-            # 每次调用都重新初始化合成器，确保状态干净
-            self._init_synthesizer()
-                
-            # 这些属性现在与本次 specific_call 及其新的 synthesizer/callback 关联
-            self.current_text = text
-            self.current_event = textevent
-            self.first_chunk = True 
-            
-            self.synthesizer.streaming_call(text)
-            self.synthesizer.streaming_complete()
-            
-        except Exception as e:
-            logger.error(f"Error in DashScopeStreamTTS txt_to_audio for text '{text}': {str(e)}")
-            # 不需要在这里重新初始化，下一次 txt_to_audio 调用会处理
-            # 也不需要管理 is_processing 标志
-            return
-
-    def stream_tts(self,audio_stream,msg):
-        text,textevent = msg
-        first = True
-        for chunk in audio_stream:
-            if chunk is not None and len(chunk)>0:          
-                stream = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32767
-                stream = resampy.resample(x=stream, sr_orig=22050, sr_new=self.sample_rate)
+                # stream = resampy.resample(x=stream, sr_orig=22050, sr_new=self.sample_rate)
                 #byte_stream=BytesIO(buffer)
                 #stream = self.__create_bytes_stream(byte_stream)
                 streamlen = stream.shape[0]

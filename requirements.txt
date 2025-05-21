@@ -1,5 +1,4 @@
 torch-ema
-torchvision
 ninja
 trimesh
 opencv-python
@@ -44,3 +43,4 @@ librosa
 openai
 dashscope
 dotenv
+pyaudio

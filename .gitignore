@@ -22,3 +22,5 @@ models/
 *.log
 dist
 
+*.bz2
+.env
