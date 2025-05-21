@@ -553,8 +553,8 @@ class DashScopeTTS(BaseTTS):
             self.current_text = text
             self.current_event = textevent
             self.first_chunk = True
-            if opt.voice_id_dashscope != None:
-                voice_id = opt.voice_id_dashscope
+            if self.opt.voice_id_dashscope != None:
+                voice_id = self.opt.voice_id_dashscope
                 logger.info("当前使用用户定义音色id: %s", voice_id)
             else:
                 # 从环境变量中获取音色ID
