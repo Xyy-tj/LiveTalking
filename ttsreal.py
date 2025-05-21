@@ -553,9 +553,17 @@ class DashScopeTTS(BaseTTS):
             self.current_text = text
             self.current_event = textevent
             self.first_chunk = True
+            if opt.voice_id_dashscope != None:
+                voice_id = opt.voice_id_dashscope
+                logger.info("当前使用用户定义音色id: %s", voice_id)
+            else:
+                # 从环境变量中获取音色ID
+                voice_id = os.getenv("DASHSCOPE_VOICE_ID")
+                logger.info("当前使用环境变量音色id: %s", voice_id)
+        
             synthesizer = SpeechSynthesizer(
                 model="cosyvoice-v2",
-                voice = os.getenv("DASHSCOPE_VOICE_ID"),
+                voice = voice_id,
                 format=AudioFormat.WAV_16000HZ_MONO_16BIT,
                 callback=self._create_callback()
             )

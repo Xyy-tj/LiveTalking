@@ -44,3 +44,6 @@ openai
 dashscope
 dotenv
 pyaudio
+
+# Tencent Cloud COS SDK
+cos-python-sdk-v5>=1.9.25

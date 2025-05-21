@@ -47,6 +47,8 @@ from typing import Dict
 from logger import logger
 import cv2
 import threading
+import time
+import os
 
 
 app = Flask(__name__)
@@ -55,6 +57,14 @@ nerfreals:Dict[int, BaseReal] = {} #sessionid:BaseReal
 opt = None
 model = None
 avatar = None
+
+# 配置腾讯云COS
+app.config.update({
+    'COS_SECRET_ID': os.getenv('COS_SECRET_ID'),
+    'COS_SECRET_KEY': os.getenv('COS_SECRET_KEY'),
+    'COS_REGION': os.getenv('COS_REGION', 'ap-guangzhou'),
+    'COS_BUCKET': os.getenv('COS_BUCKET')
+})
         
 
 #####webrtc###############################
@@ -390,6 +400,7 @@ if __name__ == '__main__':
     parser.add_argument('--customvideo_config', type=str, default='')
 
     parser.add_argument('--tts', type=str, default='dashscope') #xtts gpt-sovits cosyvoice
+    parser.add_argument('--voice_id_dashscope', type=str, default=None, help='DashScope voice name')
     parser.add_argument('--voice_name', type=str, default='zh-CN-XiaoxiaoNeural', help='EdgeTTS voice name')
     parser.add_argument('--REF_FILE', type=str, default=None)
     parser.add_argument('--REF_TEXT', type=str, default=None)
@@ -478,7 +489,8 @@ if __name__ == '__main__':
         rendthrd.start()
 
     #############################################################################
-    appasync = web.Application()
+    # 配置客户端最大上传大小为50MB
+    appasync = web.Application(client_max_size=50 * 1024 * 1024)
     appasync.on_shutdown.append(on_shutdown)
     appasync.router.add_post("/offer", offer)
     appasync.router.add_post("/human", human)
@@ -505,7 +517,94 @@ if __name__ == '__main__':
         pagename='echoapi.html'
     elif opt.transport=='rtcpush':
         pagename='rtcpushapi.html'
+    
+    # 添加语音上传页面路由
+    async def voice_upload_page(request):
+        return web.FileResponse('web/voice_upload.html')
+    appasync.router.add_get('/voice_upload', voice_upload_page)
+
+    async def upload_voice_handler(request):
+        try:
+            # 获取上传的文件
+            data = await request.post()
+            if 'voice_file' not in data:
+                return web.json_response({'status': 'error', 'message': 'No file uploaded'}, status=400)
+            
+            file = data['voice_file']
+            if not file.filename:
+                return web.json_response({'status': 'error', 'message': 'No selected file'}, status=400)
+            
+            # 检查文件大小（限制为50MB）
+            file_size = len(file.file.read())
+            file.file.seek(0)  # 重置文件指针
+            if file_size > 50 * 1024 * 1024:  # 50MB in bytes
+                return web.json_response({
+                    'status': 'error',
+                    'message': 'File size exceeds 50MB limit'
+                }, status=400)
+
+            # 配置腾讯云COS
+            from qcloud_cos import CosConfig
+            from qcloud_cos import CosS3Client
+            import uuid
+
+            secret_id = app.config.get('COS_SECRET_ID')
+            secret_key = app.config.get('COS_SECRET_KEY')
+            region = app.config.get('COS_REGION')
+            bucket = app.config.get('COS_BUCKET')
+
+            if not all([secret_id, secret_key, region, bucket]):
+                return web.json_response({'status': 'error', 'message': 'COS configuration missing'}, status=500)
+
+            config = CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key)
+            client = CosS3Client(config)
+
+            # 生成唯一文件名
+            file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'wav'
+            unique_filename = f"voice_{str(uuid.uuid4())}.{file_extension}"
+
+            # 读取文件内容
+            file_content = file.file.read()
+
+            # 上传到COS
+            response = client.put_object(
+                Bucket=bucket,
+                Body=file_content,
+                Key='digitalhuman/voice/'+unique_filename
+            )
+
+            # 获取文件访问URL
+            file_url = client.get_object_url(
+                Bucket=bucket,
+                Key=unique_filename
+            )
+
+            # 调用create_voice创建音色
+            from dashscope.audio.tts_v2 import VoiceEnrollmentService
+            service = VoiceEnrollmentService()
+            prefix = data.get('prefix', 'custom_voice')
+            target_model = data.get('target_model', 'cosyvoice-v2')
+
+            voice_id = service.create_voice(target_model=target_model, prefix=prefix, url=file_url)
+
+            # 更新当前使用的voice_name
+            app.config['voice_name'] = voice_id
+
+            logger.info(f"Created voice with ID: {voice_id}")
+            return web.json_response({
+                'status': 'success',
+                'voice_id': voice_id,
+                'file_url': file_url
+            })
+
+        except Exception as e:
+            logger.error(f"Error in upload_voice: {str(e)}")
+            return web.json_response({'status': 'error', 'message': str(e)}, status=500)
+
+    appasync.router.add_post('/upload_voice', upload_voice_handler)
+    
     logger.info('start http server; http://<serverip>:'+str(opt.listenport)+'/'+pagename)
+    logger.info('voice upload page: http://<serverip>:'+str(opt.listenport)+'/voice_upload')
     def run_server(runner):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -536,6 +635,110 @@ if __name__ == '__main__':
             app.config['voice_name'] = data['voice']
             return jsonify({'status': 'success'})
         return jsonify({'status': 'error'}), 400
+
+    @app.route('/get_voice_id', methods=['GET'])
+    def get_voice_id():
+        try:
+            voice_id = app.config.get('voice_name', '')
+            return jsonify({
+                'status': 'success',
+                'voice_id': voice_id
+            })
+        except Exception as e:
+            logger.error(f"Error getting voice ID: {str(e)}")
+            return jsonify({
+                'status': 'error',
+                'message': str(e)
+            }), 500
+
+
+    @app.route('/upload_voice', methods=['POST'])
+    def upload_voice():
+        try:
+            # 检查是否有文件上传
+            if 'voice_file' not in request.files:
+                return jsonify({'status': 'error', 'message': 'No file uploaded'}), 400
+            
+            file = request.files['voice_file']
+            if file.filename == '':
+                return jsonify({'status': 'error', 'message': 'No selected file'}), 400
+
+            # 导入腾讯云COS SDK
+            from qcloud_cos import CosConfig
+            from qcloud_cos import CosS3Client
+            import sys
+            import logging
+
+            # 配置腾讯云COS
+            secret_id = app.config.get('COS_SECRET_ID')  # 请在环境变量或配置文件中设置
+            secret_key = app.config.get('COS_SECRET_KEY')  # 请在环境变量或配置文件中设置
+            region = app.config.get('COS_REGION', 'ap-guangzhou')  # 替换为您的存储桶地区
+            bucket = app.config.get('COS_BUCKET')  # 替换为您的存储桶名称
+
+            config = CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key)
+            client = CosS3Client(config)
+
+            # 生成唯一的文件名
+            import uuid
+            file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'wav'
+            unique_filename = f"voice_{str(uuid.uuid4())}.{file_extension}"
+
+            # 上传到COS
+            response = client.put_object(
+                Bucket=bucket,
+                Body=file.read(),
+                Key=unique_filename
+            )
+
+            # 获取文件访问URL
+            file_url = client.get_object_url(
+                Bucket=bucket,
+                Key=unique_filename
+            )
+
+            # 调用create_voice创建音色
+            import dashscope
+            from dashscope.audio.tts_v2 import VoiceEnrollmentService
+
+            service = VoiceEnrollmentService()
+            prefix = request.form.get('prefix', 'custom_voice')
+            target_model = request.form.get('target_model', 'cosyvoice-v2')
+
+            voice_id = service.create_voice(target_model=target_model, prefix=prefix, url=file_url)
+
+            # 更新当前使用的voice_name
+            app.config['voice_name'] = voice_id
+
+            logger.info(f"Created voice with ID: {voice_id}")
+            return jsonify({
+                'status': 'success',
+                'voice_id': voice_id,
+                'file_url': file_url
+            })
+
+        except Exception as e:
+            logger.error(f"Error in upload_voice: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
+    @app.route('/create_voice', methods=['POST'])
+    def create_voice():
+        import dashscope
+        from dashscope.audio.tts_v2 import VoiceEnrollmentService
+
+        data = request.get_json()
+        if 'text' in data:
+            text = data['text']
+            voice_name = app.config['voice_name']
+            voice_id = voice_name.replace(' ','_')
+        service = VoiceEnrollmentService()
+        prefix = data['prefix'] if 'prefix' in data else "prefix"
+        target_model = data['target_model'] if 'target_model' in data else "cosyvoice-v2"
+
+        voice_id = service.create_voice(target_model=target_model, prefix=prefix, url=url)
+
+        logger.info(f"voice id为：{voice_id}")
+        return jsonify({'status':'success','voice_id':voice_id})
+        
     
 
 class BaseReal:

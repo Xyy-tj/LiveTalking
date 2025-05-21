@@ -28,6 +28,11 @@
     <input id="use-stun" type="checkbox"/>
     <label for="use-stun">Use STUN server</label>
 </div>
+<div class="option">
+    <label>当前音色ID: </label>
+    <span id="current-voice-id">loading...</span>
+    <button onclick="refreshVoiceId()">刷新</button>
+</div>
 <button id="start" onclick="start()">Start</button>
 <button id="stop" style="display: none" onclick="stop()">Stop</button>
 <button class="btn btn-primary" id="btn_start_record">Start Recording</button>
@@ -55,6 +60,23 @@
 <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
 </body>
 <script type="text/javascript" charset="utf-8">
+    async function refreshVoiceId() {
+        try {
+            const response = await fetch('/get_voice_id');
+            const data = await response.json();
+            if (data.status === 'success') {
+                document.getElementById('current-voice-id').textContent = data.voice_id;
+            } else {
+                document.getElementById('current-voice-id').textContent = '获取失败';
+            }
+        } catch (error) {
+            document.getElementById('current-voice-id').textContent = '获取失败';
+            console.error('Error fetching voice ID:', error);
+        }
+    }
+
+    // 页面加载时获取音色ID
+    document.addEventListener('DOMContentLoaded', refreshVoiceId);
 
 	$(document).ready(function() {
 	  // var host = window.location.hostname
