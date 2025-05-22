@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置 - LiveTalking</title>
+    <!-- 引入 Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- 引入 Element Plus -->
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+    <script src="https://unpkg.com/element-plus"></script>
+    <!-- 引入图标 -->
+    <script src="https://unpkg.com/@element-plus/icons-vue"></script>
+    <!-- 引入动画库 -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <style>
+        :root {
+            --primary-color: #409EFF;
+            --success-color: #67C23A;
+            --warning-color: #E6A23C;
+            --danger-color: #F56C6C;
+            --info-color: #909399;
+            --primary-text: #303133;
+            --regular-text: #606266;
+            --secondary-text: #909399;
+            --placeholder-text: #C0C4CC;
+            --border-color: #DCDFE6;
+            --page-background: #F5F7FA;
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--el-font-family);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: var(--page-background);
+            color: var(--primary-text);
+        }
+
+        .page-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 240px;
+            background: linear-gradient(180deg, #2B3A67 0%, #1A2544 100%);
+            border-right: none;
+            transition: all 0.3s ease;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 1000;
+        }
+
+        .sidebar.collapsed {
+            width: 64px;
+        }
+
+        .sidebar-toggle {
+            position: absolute;
+            right: -16px;
+            top: 20px;
+            width: 32px;
+            height: 32px;
+            background: var(--primary-color);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            z-index: 1001;
+            padding: 0;
+        }
+
+        .sidebar-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            background: var(--primary-color);
+        }
+
+        .sidebar-toggle .el-icon {
+            transition: transform 0.3s ease;
+            font-size: 16px;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sidebar.collapsed .sidebar-toggle .el-icon {
+            transform: rotate(180deg);
+        }
+
+        .el-menu {
+            border-right: none !important;
+            background: transparent !important;
+        }
+
+        .el-menu-item {
+            color: #ffffff !important;
+            height: 56px !important;
+            line-height: 56px !important;
+            margin: 8px 0;
+            border-radius: 0 24px 24px 0;
+            margin-right: 16px;
+            transition: all 0.3s ease !important;
+        }
+
+        .el-menu-item .el-icon {
+            font-size: 20px;
+        }
+
+        .el-menu-item:hover {
+            background: rgba(255,255,255,0.1) !important;
+            padding-left: 25px !important;
+        }
+
+        .el-menu-item.is-active {
+            background: var(--primary-color) !important;
+            color: #ffffff !important;
+            font-weight: 500;
+            padding-left: 25px !important;
+        }
+
+        .el-menu-item.is-active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 24px;
+            background: #ffffff;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 32px;
+            transition: all 0.3s ease;
+            background-color: var(--page-background);
+        }
+
+        .upload-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 32px;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+
+        .upload-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+        }
+
+        .section-title {
+            margin: 0 0 32px 0;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--primary-text);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-title .el-icon {
+            font-size: 28px;
+            color: var(--primary-color);
+        }
+
+        .el-upload-dragger {
+            width: 100% !important;
+            height: 200px !important;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed var(--border-color) !important;
+            border-radius: 12px !important;
+            background: #FAFAFA !important;
+            transition: all 0.3s ease !important;
+        }
+
+        .el-upload-dragger:hover {
+            border-color: var(--primary-color) !important;
+            background: #F5F7FA !important;
+        }
+
+        .el-upload__text {
+            margin-top: 16px;
+            font-size: 16px;
+            color: var(--regular-text);
+        }
+
+        .el-upload__text em {
+            color: var(--primary-color);
+            font-style: normal;
+            font-weight: 600;
+        }
+
+        .el-icon--upload {
+            font-size: 48px !important;
+            color: var(--primary-color) !important;
+            margin-bottom: 16px;
+        }
+
+        .file-info {
+            margin: 16px 0;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .file-info.success {
+            background-color: #F0F9EB;
+            color: var(--success-color);
+            border: 1px solid #E1F3D8;
+        }
+
+        .file-info.error {
+            background-color: #FEF0F0;
+            color: var(--danger-color);
+            border: 1px solid #FDE2E2;
+        }
+
+        .el-form-item {
+            margin-bottom: 24px;
+        }
+
+        .el-form-item__label {
+            font-weight: 500 !important;
+            color: var(--primary-text) !important;
+            font-size: 15px !important;
+            margin-bottom: 8px;
+        }
+
+        .el-input__wrapper {
+            border-radius: 8px !important;
+            box-shadow: 0 0 0 1px var(--border-color) !important;
+        }
+
+        .el-input__wrapper:hover {
+            box-shadow: 0 0 0 1px var(--primary-color) !important;
+        }
+
+        .el-button {
+            height: 40px;
+            padding: 0 24px;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .el-button--primary {
+            background: linear-gradient(45deg, var(--primary-color), #66B1FF);
+            border: none;
+        }
+
+        .el-button--primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(64,158,255,0.3);
+        }
+
+        .el-alert {
+            margin-top: 24px;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .upload-steps {
+            margin: 24px 0;
+            padding: 16px;
+            background: #F5F7FA;
+            border-radius: 8px;
+        }
+
+        .upload-steps h3 {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            color: var(--primary-text);
+        }
+
+        .upload-steps ol {
+            margin: 0;
+            padding-left: 20px;
+            color: var(--regular-text);
+        }
+
+        .upload-steps li {
+            margin: 8px 0;
+        }
+
+        .feature-tags {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .feature-tag {
+            padding: 6px 12px;
+            background: #F5F7FA;
+            border-radius: 16px;
+            font-size: 13px;
+            color: var(--regular-text);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .feature-tag .el-icon {
+            font-size: 14px;
+            color: var(--primary-color);
+        }
+
+        .preview-container {
+            margin: 24px 0;
+            padding: 20px;
+            background: #F8F9FA;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .preview-container:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+        }
+
+        .preview-container h4 {
+            margin: 0 0 16px 0;
+            color: var(--primary-text);
+            font-size: 16px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .preview-container h4 .el-icon {
+            color: var(--primary-color);
+        }
+
+        .audio-preview {
+            width: 100%;
+            margin: 0;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .audio-preview audio {
+            width: 100%;
+            height: 44px;
+            outline: none;
+        }
+
+        /* 自定义音频播放器样式 */
+        .audio-preview audio::-webkit-media-controls-panel {
+            background: white;
+            border-radius: 8px;
+        }
+
+        .audio-preview audio::-webkit-media-controls-play-button {
+            background-color: var(--primary-color);
+            border-radius: 50%;
+            margin: 0 8px;
+        }
+
+        .audio-preview audio::-webkit-media-controls-timeline {
+            background-color: #E4E7ED;
+            border-radius: 2px;
+            margin: 0 16px;
+        }
+
+        .audio-preview audio::-webkit-media-controls-current-time-display,
+        .audio-preview audio::-webkit-media-controls-time-remaining-display {
+            color: var(--regular-text);
+            margin: 0 4px;
+        }
+
+        .audio-preview audio::-webkit-media-controls-volume-slider {
+            background-color: #E4E7ED;
+            border-radius: 2px;
+            padding: 0 8px;
+        }
+
+        .video-preview {
+            width: 100%;
+            margin: 0;
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .video-preview video {
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            background: black;
+        }
+
+        .preview-placeholder {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--secondary-text);
+            font-size: 14px;
+            background: white;
+            border-radius: 8px;
+            border: 2px dashed var(--border-color);
+        }
+
+        .preview-placeholder .el-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            color: var(--border-color);
+        }
+
+        .preview-placeholder .text {
+            color: var(--secondary-text);
+            margin-top: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 16px;
+            }
+
+            .upload-container {
+                padding: 24px;
+            }
+
+            .sidebar {
+                width: 64px;
+            }
+
+            .el-menu-item span {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="page-container">
+            <el-container>
+                <el-aside :width="isCollapse ? '64px' : '240px'" class="sidebar" :class="{ collapsed: isCollapse }">
+                    <button class="sidebar-toggle" @click="toggleSidebar" :title="isCollapse ? '展开菜单' : '收起菜单'">
+                        <el-icon><ArrowLeft /></el-icon>
+                    </button>
+                    <el-menu
+                        :collapse="isCollapse"
+                        :default-active="activeTab"
+                        class="el-menu-vertical"
+                        @select="handleSelect">
+                        <el-menu-item index="voiceUpload">
+                            <el-icon><Microphone /></el-icon>
+                            <template #title>自定义语音上传</template>
+                        </el-menu-item>
+                        <el-menu-item index="avatarUpload">
+                            <el-icon><Avatar /></el-icon>
+                            <template #title>数字人形象上传</template>
+                        </el-menu-item>
+                    </el-menu>
+                </el-aside>
+                
+                <el-main class="main-content">
+                    <div v-show="activeTab === 'voiceUpload'" class="upload-container" data-aos="fade-up">
+                        <h2 class="section-title">
+                            <el-icon><Microphone /></el-icon>
+                            自定义语音上传
+                        </h2>
+
+                        <div class="feature-tags">
+                            <span class="feature-tag">
+                                <el-icon><Document /></el-icon>
+                                支持多种音频格式
+                            </span>
+                            <span class="feature-tag">
+                                <el-icon><Upload /></el-icon>
+                                最大50MB
+                            </span>
+                            <span class="feature-tag">
+                                <el-icon><Timer /></el-icon>
+                                快速处理
+                            </span>
+                        </div>
+
+                        <div class="upload-steps">
+                            <h3>上传步骤</h3>
+                            <ol>
+                                <li>选择或拖拽音频文件到上传区域</li>
+                                <li>设置音色前缀（可选）</li>
+                                <li>确认目标模型</li>
+                                <li>点击上传按钮开始处理</li>
+                            </ol>
+                        </div>
+
+                        <el-form :model="voiceForm" label-position="top">
+                            <el-form-item label="语音文件">
+                                <el-upload
+                                    class="upload-demo"
+                                    drag
+                                    action="/upload_voice"
+                                    :on-change="handleVoiceFileChange"
+                                    :before-upload="beforeVoiceUpload"
+                                    :auto-upload="false">
+                                    <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+                                    <div class="el-upload__text">
+                                        将文件拖到此处，或<em>点击上传</em>
+                                    </div>
+                                    <template #tip>
+                                        <div class="el-upload__tip">
+                                            支持 MP3, WAV, AAC 等音频格式，文件大小不超过 50MB
+                                        </div>
+                                    </template>
+                                </el-upload>
+                                <div v-if="voiceFileInfo" class="file-info" :class="voiceFileInfo.type">
+                                    {{ voiceFileInfo.message }}
+                                </div>
+                                <div class="preview-container" v-if="audioPreview">
+                                    <h4>音频预览</h4>
+                                    <div class="audio-preview">
+                                        <audio controls :src="audioPreview"></audio>
+                                    </div>
+                                </div>
+                                <div class="preview-container" v-else>
+                                    <div class="preview-placeholder">
+                                        <el-icon><Headset /></el-icon>
+                                        <div>上传音频后可在此处预览</div>
+                                    </div>
+                                </div>
+                            </el-form-item>
+                            
+                            <el-form-item label="音色前缀">
+                                <el-input 
+                                    v-model="voiceForm.prefix" 
+                                    placeholder="自定义音色前缀"
+                                    clearable>
+                                    <template #prefix>
+                                        <el-icon><Edit /></el-icon>
+                                    </template>
+                                </el-input>
+                            </el-form-item>
+                            
+                            <el-form-item label="目标模型">
+                                <el-select v-model="voiceForm.targetModel" placeholder="请选择目标模型" class="w-100">
+                                    <el-option label="CosyVoice V2" value="cosyvoice-v2" />
+                                    <el-option label="CosyVoice V1" value="cosyvoice-v1" />
+                                </el-select>
+                            </el-form-item>
+                            
+                            <el-form-item>
+                                <el-button type="primary" @click="submitVoiceForm" :loading="uploading">
+                                    {{ uploading ? '处理中...' : '上传并创建音色' }}
+                                </el-button>
+                            </el-form-item>
+                        </el-form>
+                        
+                        <el-alert
+                            v-if="voiceResult"
+                            :title="voiceResult.title"
+                            :type="voiceResult.type"
+                            :description="voiceResult.message"
+                            show-icon>
+                        </el-alert>
+                    </div>
+
+                    <div v-show="activeTab === 'avatarUpload'" class="upload-container" data-aos="fade-up">
+                        <h2 class="section-title">
+                            <el-icon><Avatar /></el-icon>
+                            数字人形象上传
+                        </h2>
+
+                        <div class="feature-tags">
+                            <span class="feature-tag">
+                                <el-icon><VideoCamera /></el-icon>
+                                支持MP4格式
+                            </span>
+                            <span class="feature-tag">
+                                <el-icon><Upload /></el-icon>
+                                最大200MB
+                            </span>
+                            <span class="feature-tag">
+                                <el-icon><PictureFilled /></el-icon>
+                                高清画质
+                            </span>
+                        </div>
+
+                        <div class="upload-steps">
+                            <h3>上传步骤</h3>
+                            <ol>
+                                <li>准备符合要求的MP4视频文件</li>
+                                <li>为你的数字人形象命名</li>
+                                <li>上传文件并等待处理完成</li>
+                                <li>查看生成结果</li>
+                            </ol>
+                        </div>
+
+                        <el-form :model="avatarForm" label-position="top">
+                            <el-form-item label="MP4视频文件">
+                                <el-upload
+                                    class="upload-demo"
+                                    drag
+                                    action="/upload_avatar"
+                                    :on-change="handleAvatarFileChange"
+                                    :before-upload="beforeAvatarUpload"
+                                    :auto-upload="false">
+                                    <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+                                    <div class="el-upload__text">
+                                        将文件拖到此处，或<em>点击上传</em>
+                                    </div>
+                                    <template #tip>
+                                        <div class="el-upload__tip">
+                                            仅支持 MP4 格式视频，文件大小不超过 200MB
+                                        </div>
+                                    </template>
+                                </el-upload>
+                                <div v-if="avatarFileInfo" class="file-info" :class="avatarFileInfo.type">
+                                    {{ avatarFileInfo.message }}
+                                </div>
+                                <div class="preview-container" v-if="videoPreview">
+                                    <h4>视频预览</h4>
+                                    <div class="video-preview">
+                                        <video controls :src="videoPreview"></video>
+                                    </div>
+                                </div>
+                                <div class="preview-container" v-else>
+                                    <div class="preview-placeholder">
+                                        <el-icon><VideoCamera /></el-icon>
+                                        <div>上传视频后可在此处预览</div>
+                                    </div>
+                                </div>
+                            </el-form-item>
+                            
+                            <el-form-item label="形象名称">
+                                <el-input 
+                                    v-model="avatarForm.name" 
+                                    placeholder="为你的数字人形象起个名字"
+                                    clearable>
+                                    <template #prefix>
+                                        <el-icon><User /></el-icon>
+                                    </template>
+                                </el-input>
+                            </el-form-item>
+                            
+                            <el-form-item>
+                                <el-button type="primary" @click="submitAvatarForm" :loading="avatarUploading">
+                                    {{ avatarUploading ? '处理中...' : '上传并生成形象' }}
+                                </el-button>
+                            </el-form-item>
+                        </el-form>
+                        
+                        <el-alert
+                            v-if="avatarResult"
+                            :title="avatarResult.title"
+                            :type="avatarResult.type"
+                            :description="avatarResult.message"
+                            show-icon>
+                        </el-alert>
+                    </div>
+                </el-main>
+            </el-container>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted, onUnmounted } = Vue;
+        const { ElMessage } = ElementPlus;
+        
+        const app = createApp({
+            setup() {
+                const isCollapse = ref(false);
+                const activeTab = ref('voiceUpload');
+                const uploading = ref(false);
+                const avatarUploading = ref(false);
+                const audioPreview = ref(null);
+                const videoPreview = ref(null);
+                const voiceForm = ref({
+                    prefix: '',
+                    targetModel: 'cosyvoice-v2'
+                });
+                const avatarForm = ref({
+                    name: ''
+                });
+                const voiceFileInfo = ref(null);
+                const avatarFileInfo = ref(null);
+                const voiceResult = ref(null);
+                const avatarResult = ref(null);
+
+                onMounted(() => {
+                    AOS.init({
+                        duration: 800,
+                        easing: 'ease-out-cubic',
+                        once: true
+                    });
+                });
+
+                const handleSelect = (key) => {
+                    activeTab.value = key;
+                    // 重置表单状态
+                    voiceResult.value = null;
+                    avatarResult.value = null;
+                };
+
+                const toggleSidebar = () => {
+                    isCollapse.value = !isCollapse.value;
+                };
+
+                const handleVoiceFileChange = (file) => {
+                    const sizeMB = file.size / (1024 * 1024);
+                    if (sizeMB > 50) {
+                        voiceFileInfo.value = {
+                            type: 'error',
+                            message: `文件大小 ${sizeMB.toFixed(2)}MB 超过50MB限制`
+                        };
+                        audioPreview.value = null;
+                        return false;
+                    }
+                    voiceFileInfo.value = {
+                        type: 'success',
+                        message: `文件大小: ${sizeMB.toFixed(2)}MB`
+                    };
+                    
+                    // 创建音频预览URL
+                    if (audioPreview.value) {
+                        URL.revokeObjectURL(audioPreview.value);
+                    }
+                    audioPreview.value = URL.createObjectURL(file.raw);
+                };
+
+                const handleAvatarFileChange = (file) => {
+                    const sizeMB = file.size / (1024 * 1024);
+                    if (sizeMB > 200) {
+                        avatarFileInfo.value = {
+                            type: 'error',
+                            message: `文件大小 ${sizeMB.toFixed(2)}MB 超过200MB限制`
+                        };
+                        videoPreview.value = null;
+                        return false;
+                    }
+                    avatarFileInfo.value = {
+                        type: 'success',
+                        message: `文件大小: ${sizeMB.toFixed(2)}MB`
+                    };
+                    
+                    // 创建视频预览URL
+                    if (videoPreview.value) {
+                        URL.revokeObjectURL(videoPreview.value);
+                    }
+                    videoPreview.value = URL.createObjectURL(file.raw);
+                };
+
+                const beforeVoiceUpload = (file) => {
+                    const isAudio = file.type.startsWith('audio/');
+                    if (!isAudio) {
+                        ElMessage.error('只能上传音频文件！');
+                        return false;
+                    }
+                    return true;
+                };
+
+                const beforeAvatarUpload = (file) => {
+                    const isMP4 = file.type === 'video/mp4';
+                    if (!isMP4) {
+                        ElMessage.error('只能上传MP4视频文件！');
+                        return false;
+                    }
+                    return true;
+                };
+
+                const submitVoiceForm = async () => {
+                    if (!voiceFileInfo.value) {
+                        ElMessage.warning('请先选择要上传的音频文件');
+                        return;
+                    }
+                    
+                    uploading.value = true;
+                    try {
+                        const formData = new FormData();
+                        // 添加表单数据
+                        const response = await fetch('/upload_voice', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const data = await response.json();
+                        
+                        voiceResult.value = {
+                            title: data.status === 'success' ? '上传成功！' : '上传失败',
+                            type: data.status === 'success' ? 'success' : 'error',
+                            message: data.status === 'success' 
+                                ? `音色ID: ${data.voice_id}\n文件URL: ${data.file_url}`
+                                : `错误信息: ${data.message}`
+                        };
+
+                        if (data.status === 'success') {
+                            ElMessage.success('音色创建成功！');
+                        }
+                    } catch (error) {
+                        voiceResult.value = {
+                            title: '上传失败',
+                            type: 'error',
+                            message: `错误信息: ${error.message}`
+                        };
+                        ElMessage.error('上传过程中发生错误');
+                    } finally {
+                        uploading.value = false;
+                    }
+                };
+
+                const submitAvatarForm = async () => {
+                    if (!avatarFileInfo.value) {
+                        ElMessage.warning('请先选择要上传的视频文件');
+                        return;
+                    }
+
+                    if (!avatarForm.value.name) {
+                        ElMessage.warning('请输入形象名称');
+                        return;
+                    }
+                    
+                    avatarUploading.value = true;
+                    try {
+                        const formData = new FormData();
+                        // 添加表单数据
+                        const response = await fetch('/upload_avatar', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const data = await response.json();
+                        
+                        avatarResult.value = {
+                            title: data.status === 'success' ? '上传成功！' : '上传失败',
+                            type: data.status === 'success' ? 'success' : 'error',
+                            message: data.status === 'success' 
+                                ? `形象ID: ${data.avatar_id}\n文件URL: ${data.file_url}`
+                                : `错误信息: ${data.message}`
+                        };
+
+                        if (data.status === 'success') {
+                            ElMessage.success('形象创建成功！');
+                        }
+                    } catch (error) {
+                        avatarResult.value = {
+                            title: '上传失败',
+                            type: 'error',
+                            message: `错误信息: ${error.message}`
+                        };
+                        ElMessage.error('上传过程中发生错误');
+                    } finally {
+                        avatarUploading.value = false;
+                    }
+                };
+
+                // 组件卸载时清理资源
+                onUnmounted(() => {
+                    if (audioPreview.value) {
+                        URL.revokeObjectURL(audioPreview.value);
+                    }
+                    if (videoPreview.value) {
+                        URL.revokeObjectURL(videoPreview.value);
+                    }
+                });
+
+                return {
+                    isCollapse,
+                    activeTab,
+                    uploading,
+                    avatarUploading,
+                    audioPreview,
+                    videoPreview,
+                    voiceForm,
+                    avatarForm,
+                    voiceFileInfo,
+                    avatarFileInfo,
+                    voiceResult,
+                    avatarResult,
+                    toggleSidebar,
+                    handleSelect,
+                    handleVoiceFileChange,
+                    handleAvatarFileChange,
+                    beforeVoiceUpload,
+                    beforeAvatarUpload,
+                    submitVoiceForm,
+                    submitAvatarForm
+                };
+            }
+        });
+
+        app.use(ElementPlus);
+        app.mount('#app');
+    </script>
+</body>
+</html>

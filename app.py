@@ -519,9 +519,9 @@ if __name__ == '__main__':
         pagename='rtcpushapi.html'
     
     # 添加语音上传页面路由
-    async def voice_upload_page(request):
-        return web.FileResponse('web/voice_upload.html')
-    appasync.router.add_get('/voice_upload', voice_upload_page)
+    async def setting_page(request):
+        return web.FileResponse('web/setting.html')
+    appasync.router.add_get('/setting', setting_page)
 
     async def upload_voice_handler(request):
         try:
