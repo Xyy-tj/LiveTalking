@@ -21,6 +21,7 @@ import soundfile as sf
 import resampy
 import asyncio
 import edge_tts
+import wave
 
 from typing import Iterator
 
@@ -224,8 +225,8 @@ class FishTTS(BaseTTS):
                     self.parent.put_audio_frame(stream[idx:idx+self.chunk],eventpoint)
                     streamlen -= self.chunk
                     idx += self.chunk
-        eventpoint={'status':'end','text':text,'msgenvent':textevent}
-        self.parent.put_audio_frame(np.zeros(self.chunk,np.float32),eventpoint) 
+        # eventpoint={'status':'end','text':text,'msgenvent':textevent}
+        # self.parent.put_audio_frame(np.zeros(self.chunk,np.float32),eventpoint) 
 
 ###########################################################################################
 class VoitsTTS(BaseTTS):
@@ -321,8 +322,8 @@ class VoitsTTS(BaseTTS):
                     self.parent.put_audio_frame(stream[idx:idx+self.chunk],eventpoint)
                     streamlen -= self.chunk
                     idx += self.chunk
-        eventpoint={'status':'end','text':text,'msgenvent':textevent}
-        self.parent.put_audio_frame(np.zeros(self.chunk,np.float32),eventpoint)
+        # eventpoint={'status':'end','text':text,'msgenvent':textevent}
+        # self.parent.put_audio_frame(np.zeros(self.chunk,np.float32),eventpoint)
 
 ###########################################################################################
 class CosyVoiceTTS(BaseTTS):
@@ -387,8 +388,8 @@ class CosyVoiceTTS(BaseTTS):
                     self.parent.put_audio_frame(stream[idx:idx+self.chunk],eventpoint)
                     streamlen -= self.chunk
                     idx += self.chunk
-        eventpoint={'status':'end','text':text,'msgenvent':textevent}
-        self.parent.put_audio_frame(np.zeros(self.chunk,np.float32),eventpoint) 
+        # eventpoint={'status':'end','text':text,'msgenvent':textevent}
+        # self.parent.put_audio_frame(np.zeros(self.chunk,np.float32),eventpoint) 
 
 ###########################################################################################
 class XTTS(BaseTTS):
@@ -463,8 +464,8 @@ class XTTS(BaseTTS):
                     self.parent.put_audio_frame(stream[idx:idx+self.chunk],eventpoint)
                     streamlen -= self.chunk
                     idx += self.chunk
-        eventpoint={'status':'end','text':text,'msgenvent':textevent}
-        self.parent.put_audio_frame(np.zeros(self.chunk,np.float32),eventpoint)  
+        # eventpoint={'status':'end','text':text,'msgenvent':textevent}
+        # self.parent.put_audio_frame(np.zeros(self.chunk,np.float32),eventpoint)  
 
 ###########################################################################################
 class DashScopeTTS(BaseTTS):
@@ -480,6 +481,9 @@ class DashScopeTTS(BaseTTS):
         self.current_text = None
         self.current_event = None
         self.first_chunk = True
+        self.internal_audio_buffer = np.array([], dtype=np.float32)
+        self.has_saved_first_raw_chunk = False
+        self.truncate_first_data_chunk = True
 
     def _create_callback(self):
         from dashscope.audio.tts_v2 import ResultCallback
@@ -493,8 +497,24 @@ class DashScopeTTS(BaseTTS):
                 
             def on_complete(self):
                 logger.info("DashScope TTS synthesis completed")
-                # 发送结束事件
-                if self.parent.current_text and self.parent.current_event:
+
+                # 处理内部缓冲区中剩余的音频数据
+                if len(self.parent.internal_audio_buffer) > 0 and self.parent.state == State.RUNNING:
+                    remaining_audio = self.parent.internal_audio_buffer
+                    # 如果剩余数据不足一个标准块，则用静音填充
+                    if len(remaining_audio) < self.parent.chunk:
+                        padding = np.zeros(self.parent.chunk - len(remaining_audio), dtype=np.float32)
+                        remaining_audio = np.concatenate((remaining_audio, padding))
+                    
+                    # 确保只发送一个标准块大小的音频数据
+                    frame_to_send = remaining_audio[:self.parent.chunk]
+                    self.parent.parent.put_audio_frame(frame_to_send, None) # 不再需要特殊事件，因为下一个是结束事件
+                
+                # 清空缓冲区，以防万一
+                self.parent.internal_audio_buffer = np.array([], dtype=np.float32)
+                
+                # 发送一个全静音的音频帧作为明确的结束信号
+                if self.parent.current_text and self.parent.current_event and self.parent.state == State.RUNNING:
                     eventpoint = {
                         'status': 'end',
                         'text': self.parent.current_text,
@@ -514,29 +534,80 @@ class DashScopeTTS(BaseTTS):
             def on_data(self, data: bytes) -> None:
                 if not data or len(data) == 0:
                     return
-                    
+                
+                processed_data = data # Use a new variable for data after potential truncation
+
+                # Save and potentially truncate the very first raw data chunk received from DashScope
+                if not self.parent.has_saved_first_raw_chunk and data:
+                    try:
+                        # Save the original first chunk
+                        original_filename = "first_chunk_original.wav"
+                        with wave.open(original_filename, 'wb') as wf:
+                            wf.setnchannels(1)
+                            wf.setsampwidth(2)
+                            wf.setframerate(16000)
+                            wf.writeframes(data)
+                        logger.info(f"Saved the original first raw DashScope audio chunk to {original_filename}")
+
+                        if self.parent.truncate_first_data_chunk:
+                            TRUNCATE_BYTES = 320 # About 10ms at 16kHz, 16-bit mono
+                            if len(data) > TRUNCATE_BYTES:
+                                processed_data = data[TRUNCATE_BYTES:]
+                                logger.info(f"Truncated the first data chunk by {TRUNCATE_BYTES} bytes.")
+                                # Save the truncated first chunk for comparison
+                                truncated_filename = "first_chunk_truncated.wav"
+                                with wave.open(truncated_filename, 'wb') as wf:
+                                    wf.setnchannels(1)
+                                    wf.setsampwidth(2)
+                                    wf.setframerate(16000)
+                                    wf.writeframes(processed_data)
+                                logger.info(f"Saved the truncated first raw DashScope audio chunk to {truncated_filename}")
+                            else:
+                                logger.warning(f"First data chunk is too short ({len(data)} bytes) to truncate by {TRUNCATE_BYTES} bytes. Using original.")
+                            self.parent.truncate_first_data_chunk = False # Only truncate the very first chunk of a sentence
+                        
+                        self.parent.has_saved_first_raw_chunk = True # Mark that we've processed (saved/truncated) the first chunk
+                    except Exception as e:
+                        logger.error(f"Error saving/truncating first raw DashScope chunk: {e}")
+                
+                if not processed_data: # If truncation resulted in empty data, skip
+                    return
+
                 try:
-                    # 将音频数据转换为numpy数组
-                    stream = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32767
-                    # 重采样到目标采样率
-                    stream = resampy.resample(x=stream, sr_orig=16000, sr_new=self.parent.sample_rate)
+                    # 将音频数据转换为numpy数组, 使用 processed_data
+                    new_audio_chunk = np.frombuffer(processed_data, dtype=np.int16).astype(np.float32) / 32767
+                    # 仅当采样率不同时才进行重采样
+                    if 16000 != self.parent.sample_rate: # DashScope 返回的是 16000 Hz
+                        new_audio_chunk = resampy.resample(x=new_audio_chunk, sr_orig=16000, sr_new=self.parent.sample_rate)
                     
-                    streamlen = stream.shape[0]
-                    idx = 0
+                    # 将新接收的音频数据追加到内部缓冲区
+                    self.parent.internal_audio_buffer = np.concatenate((self.parent.internal_audio_buffer, new_audio_chunk))
                     
-                    while streamlen >= self.parent.chunk and self.parent.state == State.RUNNING:
-                        eventpoint = None
+                    # 当内部缓冲区数据量达到或超过标准块大小时，分块发送
+                    while len(self.parent.internal_audio_buffer) >= self.parent.chunk and self.parent.state == State.RUNNING:
+                        current_eventpoint_for_frame = None # Default to no event for this specific frame
                         if self.parent.first_chunk:
-                            eventpoint = {
+                            # 'start' event is now associated with the initial silent frame
+                            start_eventpoint = {
                                 'status': 'start',
                                 'text': self.parent.current_text,
                                 'msgenvent': self.parent.current_event
                             }
+                            # Send the initial silent frame WITH the 'start' event
+                            self.parent.parent.put_audio_frame(np.zeros(self.parent.chunk, np.float32), start_eventpoint)
                             self.parent.first_chunk = False
                             
-                        self.parent.parent.put_audio_frame(stream[idx:idx+self.parent.chunk], eventpoint)
-                        streamlen -= self.parent.chunk
-                        idx += self.parent.chunk
+                            # The actual first audio frame will be processed in the next iteration or immediately if buffer is short,
+                            # and it won't have the start event again.
+                            # We need to ensure this loop iteration doesn't send another frame if the silent frame was the only thing processed.
+                            # However, the standard logic below will pick up the first real audio frame correctly.
+                            
+                        # Take one standard-sized audio frame from the buffer
+                        frame_to_send = self.parent.internal_audio_buffer[:self.parent.chunk]
+                        self.parent.internal_audio_buffer = self.parent.internal_audio_buffer[self.parent.chunk:]
+                        
+                        # current_eventpoint_for_frame is None unless explicitly set (e.g. for a future different event type)
+                        self.parent.parent.put_audio_frame(frame_to_send, current_eventpoint_for_frame)
                         
                 except Exception as e:
                     logger.error(f"Error processing audio chunk: {str(e)}")
@@ -552,7 +623,11 @@ class DashScopeTTS(BaseTTS):
             # 对于每次新的语音合成，需要确保状态是干净的
             self.current_text = text
             self.current_event = textevent
-            self.first_chunk = True
+            self.first_chunk = True  # 标记这是新文本的第一个待处理块
+            self.internal_audio_buffer = np.array([], dtype=np.float32) # 初始化内部音频缓冲区
+            self.has_saved_first_raw_chunk = False # Reset flag for each new synthesis, to save its first chunk
+            self.truncate_first_data_chunk = True # New flag to indicate the first actual data chunk should be truncated
+            
             if self.opt.voice_id_dashscope != None:
                 voice_id = self.opt.voice_id_dashscope
                 logger.info("当前使用用户定义音色id: %s", voice_id)
@@ -595,5 +670,5 @@ class DashScopeTTS(BaseTTS):
                     self.parent.put_audio_frame(stream[idx:idx+self.chunk],eventpoint)
                     streamlen -= self.chunk
                     idx += self.chunk
-        eventpoint={'status':'end','text':text,'msgenvent':textevent}
-        self.parent.put_audio_frame(np.zeros(self.chunk,np.float32),eventpoint)  
+        # eventpoint={'status':'end','text':text,'msgenvent':textevent}
+        # self.parent.put_audio_frame(np.zeros(self.chunk,np.float32),eventpoint)  
