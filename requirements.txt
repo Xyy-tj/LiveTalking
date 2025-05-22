@@ -48,6 +48,6 @@ pyaudio
 # Tencent Cloud COS SDK
 cos-python-sdk-v5>=1.9.25
 fastapi
-https
+python-multipart
 psutil
-sqlite3
+uvicorn

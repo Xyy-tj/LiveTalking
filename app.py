@@ -410,7 +410,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--model', type=str, default='wav2lip') #musetalk wav2lip
 
-    parser.add_argument('--transport', type=str, default='rtcpush') #rtmp webrtc rtcpush
+    parser.add_argument('--transport', type=str, default='webrtc') #rtmp webrtc rtcpush
     parser.add_argument('--push_url', type=str, default='http://124.223.167.54:1985/rtc/v1/whip/?app=live&stream=livestream') #rtmp://localhost/live/livestream
 
     parser.add_argument('--max_session', type=int, default=1)  #multi session count

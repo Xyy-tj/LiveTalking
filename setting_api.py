@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 import os
 import uuid
 import shutil
@@ -117,6 +117,11 @@ def reinit_db():
 
 # 如果需要重新初始化数据库，取消下面这行的注释
 # reinit_db()
+
+@app.get("/")
+async def root():
+    return FileResponse("web/setting.html")
+
 
 @app.post("/upload_voice")
 async def upload_voice(
@@ -569,10 +574,10 @@ def log_reader(process, log_queue):
 def kill_process_by_port(port):
     """通过端口号杀死进程"""
     try:
-        for proc in psutil.process_iter(['pid', 'name', 'connections']):
+        for proc in psutil.process_iter(['pid', 'name']):
             try:
-                connections = proc.connections()
-                for conn in connections:
+                # 获取进程的所有连接
+                for conn in proc.connections():
                     if conn.laddr.port == port:
                         # 发送 SIGTERM 信号
                         os.kill(proc.pid, signal.SIGTERM)
