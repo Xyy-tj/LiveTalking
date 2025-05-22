@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>设置 - LiveTalking</title>
-    <!-- 引入 Vue 3 -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- 引入 Vue 3 生产版本 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <!-- 引入 Element Plus -->
     <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
     <script src="https://unpkg.com/element-plus"></script>
-    <!-- 引入图标 -->
+    <!-- 引入 Element Plus 图标 -->
     <script src="https://unpkg.com/@element-plus/icons-vue"></script>
     <!-- 引入动画库 -->
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
@@ -57,9 +57,29 @@
             width: 64px;
         }
 
+        .sidebar-title {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 500;
+            padding: 20px 24px;
+            text-align: left;
+            white-space: nowrap;
+            transition: all 0.3s;
+            opacity: 1;
+            height: 24px;
+            display: block;
+        }
+
+        .sidebar.collapsed .sidebar-title {
+            opacity: 0;
+            visibility: hidden;
+            height: 32px;
+            margin: 0;
+        }
+
         .sidebar-toggle {
             position: absolute;
-            right: -16px;
+            right: 5px;
             top: 20px;
             width: 32px;
             height: 32px;
@@ -73,7 +93,7 @@
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-            z-index: 1001;
+            z-index: 9999;
             padding: 0;
         }
 
@@ -100,6 +120,11 @@
         .el-menu {
             border-right: none !important;
             background: transparent !important;
+            margin-top: 0 !important;
+        }
+
+        .el-menu--collapse {
+            width: 64px !important;
         }
 
         .el-menu-item {
@@ -110,22 +135,40 @@
             border-radius: 0 24px 24px 0;
             margin-right: 16px;
             transition: all 0.3s ease !important;
+            padding: 0 20px 0 24px !important;
+        }
+
+        .el-menu--collapse .el-menu-item {
+            padding: 0 !important;
+            text-align: center;
+            margin-right: 5px;
+        }
+
+        .el-menu--collapse .el-menu-item .el-icon {
+            margin: 0 !important;
+            width: 100% !important;
+            text-align: center;
         }
 
         .el-menu-item .el-icon {
             font-size: 20px;
+            margin-right: 16px;
+            width: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .el-menu-item:hover {
             background: rgba(255,255,255,0.1) !important;
-            padding-left: 25px !important;
+            padding-left: 28px !important;
         }
 
         .el-menu-item.is-active {
             background: var(--primary-color) !important;
             color: #ffffff !important;
             font-weight: 500;
-            padding-left: 25px !important;
+            padding-left: 28px !important;
         }
 
         .el-menu-item.is-active::before {
@@ -138,6 +181,7 @@
             height: 24px;
             background: #ffffff;
             border-radius: 0 4px 4px 0;
+            right: 30px !important;
         }
 
         .main-content {
@@ -148,7 +192,7 @@
         }
 
         .upload-container {
-            max-width: 900px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 32px;
             background-color: #ffffff;
@@ -177,6 +221,22 @@
             color: var(--primary-color);
         }
 
+        .el-form-item {
+            margin-bottom: 32px;
+        }
+
+        .el-form-item__label {
+            font-weight: 500 !important;
+            color: var(--primary-text) !important;
+            font-size: 15px !important;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .el-upload {
+            width: 100%;
+        }
+
         .el-upload-dragger {
             width: 100% !important;
             height: 200px !important;
@@ -188,93 +248,104 @@
             border-radius: 12px !important;
             background: #FAFAFA !important;
             transition: all 0.3s ease !important;
-        }
-
-        .el-upload-dragger:hover {
-            border-color: var(--primary-color) !important;
-            background: #F5F7FA !important;
-        }
-
-        .el-upload__text {
-            margin-top: 16px;
-            font-size: 16px;
-            color: var(--regular-text);
-        }
-
-        .el-upload__text em {
-            color: var(--primary-color);
-            font-style: normal;
-            font-weight: 600;
-        }
-
-        .el-icon--upload {
-            font-size: 48px !important;
-            color: var(--primary-color) !important;
             margin-bottom: 16px;
         }
 
         .file-info {
             margin: 16px 0;
-            padding: 12px;
+            padding: 16px;
             border-radius: 8px;
             font-size: 14px;
             transition: all 0.3s ease;
+            background: #F8F9FA;
+            border: 1px solid var(--border-color);
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .file-info.success {
             background-color: #F0F9EB;
             color: var(--success-color);
-            border: 1px solid #E1F3D8;
+            border-color: #E1F3D8;
         }
 
         .file-info.error {
             background-color: #FEF0F0;
             color: var(--danger-color);
-            border: 1px solid #FDE2E2;
+            border-color: #FDE2E2;
         }
 
-        .el-form-item {
-            margin-bottom: 24px;
-        }
-
-        .el-form-item__label {
-            font-weight: 500 !important;
-            color: var(--primary-text) !important;
-            font-size: 15px !important;
-            margin-bottom: 8px;
-        }
-
-        .el-input__wrapper {
-            border-radius: 8px !important;
-            box-shadow: 0 0 0 1px var(--border-color) !important;
-        }
-
-        .el-input__wrapper:hover {
-            box-shadow: 0 0 0 1px var(--primary-color) !important;
-        }
-
-        .el-button {
-            height: 40px;
-            padding: 0 24px;
-            font-weight: 500;
-            border-radius: 8px;
+        .preview-container {
+            margin: 24px 0;
+            padding: 24px;
+            background: #F8F9FA;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
             transition: all 0.3s ease;
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
         }
 
-        .el-button--primary {
-            background: linear-gradient(45deg, var(--primary-color), #66B1FF);
-            border: none;
+        .preview-container h4 {
+            margin: 0 0 16px 0;
+            color: var(--primary-text);
+            font-size: 16px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .el-button--primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(64,158,255,0.3);
+        .audio-preview {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .audio-preview audio {
+            width: 100%;
+            display: block;
+            height: 54px;
+            margin: 0;
+            outline: none;
+        }
+
+        .preview-placeholder {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--secondary-text);
+            font-size: 14px;
+            background: white;
+            border-radius: 8px;
+            border: 2px dashed var(--border-color);
+            margin: 0;
+        }
+
+        .preview-placeholder .el-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            color: var(--border-color);
+            display: block;
+        }
+
+        .form-actions {
+            margin-top: 32px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .el-input__wrapper,
+        .el-select {
+            width: 100%;
+            max-width: 400px;
         }
 
         .el-alert {
-            margin-top: 24px;
-            border-radius: 8px;
-            padding: 16px;
+            margin-top: 32px;
         }
 
         .upload-steps {
@@ -323,79 +394,6 @@
             color: var(--primary-color);
         }
 
-        .preview-container {
-            margin: 24px 0;
-            padding: 20px;
-            background: #F8F9FA;
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-            transition: all 0.3s ease;
-        }
-
-        .preview-container:hover {
-            border-color: var(--primary-color);
-            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
-        }
-
-        .preview-container h4 {
-            margin: 0 0 16px 0;
-            color: var(--primary-text);
-            font-size: 16px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .preview-container h4 .el-icon {
-            color: var(--primary-color);
-        }
-
-        .audio-preview {
-            width: 100%;
-            margin: 0;
-            padding: 12px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-
-        .audio-preview audio {
-            width: 100%;
-            height: 44px;
-            outline: none;
-        }
-
-        /* 自定义音频播放器样式 */
-        .audio-preview audio::-webkit-media-controls-panel {
-            background: white;
-            border-radius: 8px;
-        }
-
-        .audio-preview audio::-webkit-media-controls-play-button {
-            background-color: var(--primary-color);
-            border-radius: 50%;
-            margin: 0 8px;
-        }
-
-        .audio-preview audio::-webkit-media-controls-timeline {
-            background-color: #E4E7ED;
-            border-radius: 2px;
-            margin: 0 16px;
-        }
-
-        .audio-preview audio::-webkit-media-controls-current-time-display,
-        .audio-preview audio::-webkit-media-controls-time-remaining-display {
-            color: var(--regular-text);
-            margin: 0 4px;
-        }
-
-        .audio-preview audio::-webkit-media-controls-volume-slider {
-            background-color: #E4E7ED;
-            border-radius: 2px;
-            padding: 0 8px;
-        }
-
         .video-preview {
             width: 100%;
             margin: 0;
@@ -411,27 +409,6 @@
             max-height: 400px;
             object-fit: contain;
             background: black;
-        }
-
-        .preview-placeholder {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--secondary-text);
-            font-size: 14px;
-            background: white;
-            border-radius: 8px;
-            border: 2px dashed var(--border-color);
-        }
-
-        .preview-placeholder .el-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-            color: var(--border-color);
-        }
-
-        .preview-placeholder .text {
-            color: var(--secondary-text);
-            margin-top: 8px;
         }
 
         @media (max-width: 768px) {
@@ -451,6 +428,71 @@
                 display: none;
             }
         }
+
+        .el-table {
+            width: 100% !important;
+            margin-bottom: 20px;
+        }
+
+        .el-table .cell {
+            padding: 0 8px;
+            line-height: 40px;
+        }
+
+        .copy-button {
+            padding: 4px 8px;
+            margin-left: 8px;
+            color: var(--el-color-primary);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            position: relative;
+            z-index: 10;
+            background: #fff;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+
+        .copy-button:hover {
+            background: var(--el-color-primary-light-9);
+        }
+
+        .copy-icon {
+            width: 16px;
+            height: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-icon svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .voice-id-cell {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            position: relative;
+            padding-right: 80px;
+        }
+
+        .voice-id-text {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .copy-button-wrapper {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+        }
     </style>
 </head>
 <body>
@@ -458,8 +500,9 @@
         <div class="page-container">
             <el-container>
                 <el-aside :width="isCollapse ? '64px' : '240px'" class="sidebar" :class="{ collapsed: isCollapse }">
+                    <div class="sidebar-title">Digital Human Panel</div>
                     <button class="sidebar-toggle" @click="toggleSidebar" :title="isCollapse ? '展开菜单' : '收起菜单'">
-                        <el-icon><ArrowLeft /></el-icon>
+                        <el-icon><arrow-left /></el-icon>
                     </button>
                     <el-menu
                         :collapse="isCollapse"
@@ -467,12 +510,16 @@
                         class="el-menu-vertical"
                         @select="handleSelect">
                         <el-menu-item index="voiceUpload">
-                            <el-icon><Microphone /></el-icon>
+                            <el-icon><microphone /></el-icon>
                             <template #title>自定义语音上传</template>
                         </el-menu-item>
                         <el-menu-item index="avatarUpload">
-                            <el-icon><Avatar /></el-icon>
+                            <el-icon><avatar /></el-icon>
                             <template #title>数字人形象上传</template>
+                        </el-menu-item>
+                        <el-menu-item index="manage">
+                            <el-icon><document /></el-icon>
+                            <template #title>管理</template>
                         </el-menu-item>
                     </el-menu>
                 </el-aside>
@@ -480,21 +527,21 @@
                 <el-main class="main-content">
                     <div v-show="activeTab === 'voiceUpload'" class="upload-container" data-aos="fade-up">
                         <h2 class="section-title">
-                            <el-icon><Microphone /></el-icon>
+                            <el-icon><microphone /></el-icon>
                             自定义语音上传
                         </h2>
 
                         <div class="feature-tags">
                             <span class="feature-tag">
-                                <el-icon><Document /></el-icon>
+                                <el-icon><document /></el-icon>
                                 支持多种音频格式
                             </span>
                             <span class="feature-tag">
-                                <el-icon><Upload /></el-icon>
+                                <el-icon><upload /></el-icon>
                                 最大50MB
                             </span>
                             <span class="feature-tag">
-                                <el-icon><Timer /></el-icon>
+                                <el-icon><timer /></el-icon>
                                 快速处理
                             </span>
                         </div>
@@ -539,7 +586,7 @@
                                 </div>
                                 <div class="preview-container" v-else>
                                     <div class="preview-placeholder">
-                                        <el-icon><Headset /></el-icon>
+                                        <el-icon><headset /></el-icon>
                                         <div>上传音频后可在此处预览</div>
                                     </div>
                                 </div>
@@ -551,7 +598,7 @@
                                     placeholder="自定义音色前缀"
                                     clearable>
                                     <template #prefix>
-                                        <el-icon><Edit /></el-icon>
+                                        <el-icon><edit /></el-icon>
                                     </template>
                                 </el-input>
                             </el-form-item>
@@ -574,28 +621,30 @@
                             v-if="voiceResult"
                             :title="voiceResult.title"
                             :type="voiceResult.type"
-                            :description="voiceResult.message"
                             show-icon>
+                            <template #description>
+                                <div v-html="voiceResult.message"></div>
+                            </template>
                         </el-alert>
                     </div>
 
                     <div v-show="activeTab === 'avatarUpload'" class="upload-container" data-aos="fade-up">
                         <h2 class="section-title">
-                            <el-icon><Avatar /></el-icon>
+                            <el-icon><avatar /></el-icon>
                             数字人形象上传
                         </h2>
 
                         <div class="feature-tags">
                             <span class="feature-tag">
-                                <el-icon><VideoCamera /></el-icon>
+                                <el-icon><video-camera /></el-icon>
                                 支持MP4格式
                             </span>
                             <span class="feature-tag">
-                                <el-icon><Upload /></el-icon>
+                                <el-icon><upload /></el-icon>
                                 最大200MB
                             </span>
                             <span class="feature-tag">
-                                <el-icon><PictureFilled /></el-icon>
+                                <el-icon><picture-filled /></el-icon>
                                 高清画质
                             </span>
                         </div>
@@ -640,7 +689,7 @@
                                 </div>
                                 <div class="preview-container" v-else>
                                     <div class="preview-placeholder">
-                                        <el-icon><VideoCamera /></el-icon>
+                                        <el-icon><video-camera /></el-icon>
                                         <div>上传视频后可在此处预览</div>
                                     </div>
                                 </div>
@@ -652,7 +701,7 @@
                                     placeholder="为你的数字人形象起个名字"
                                     clearable>
                                     <template #prefix>
-                                        <el-icon><User /></el-icon>
+                                        <el-icon><user /></el-icon>
                                     </template>
                                 </el-input>
                             </el-form-item>
@@ -668,9 +717,203 @@
                             v-if="avatarResult"
                             :title="avatarResult.title"
                             :type="avatarResult.type"
-                            :description="avatarResult.message"
                             show-icon>
+                            <template #description>
+                                <div v-html="avatarResult.message"></div>
+                            </template>
                         </el-alert>
+                    </div>
+
+                    <div v-show="activeTab === 'manage'" class="upload-container" data-aos="fade-up">
+                        <h2 class="section-title">
+                            <el-icon><document /></el-icon>
+                            音色与数字人管理
+                        </h2>
+                        <el-tabs v-model="manageTab" @tab-click="handleTabClick">
+                            <el-tab-pane label="音色管理" name="voices">
+                                <div v-if="!voiceList || voiceList.length === 0">
+                                    <el-empty description="暂无音色数据" />
+                                </div>
+                                <div v-else>
+                                    <el-table :data="voiceList" style="width: 100%" v-loading="voiceLoading">
+                                        <el-table-column 
+                                            label="音色ID" 
+                                            min-width="400"
+                                            show-overflow-tooltip
+                                        >
+                                            <template #default="scope">
+                                                <div class="voice-id-cell">
+                                                    <span class="voice-id-text">{{ scope.row.voice_id }}</span>
+                                                    <div class="copy-button-wrapper">
+                                                        <div class="copy-button" @click.stop="copyToClipboard(scope.row.voice_id)">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" style="fill: currentColor">
+                                                                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                                                            </svg>
+                                                            <span>复制</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column 
+                                            prop="file_url" 
+                                            label="文件路径" 
+                                            min-width="300" 
+                                            show-overflow-tooltip
+                                        >
+                                            <template #default="scope">
+                                                <el-link type="primary" :href="scope.row.file_url" target="_blank">
+                                                    {{ scope.row.file_url }}
+                                                </el-link>
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column prop="prefix" label="前缀" min-width="120">
+                                            <template #default="scope">
+                                                <el-input 
+                                                    v-model="scope.row.prefix" 
+                                                    size="small"
+                                                    placeholder="请输入前缀"
+                                                    @change="value => handleVoicePrefixChange(scope.row, value)"
+                                                />
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column prop="target_model" label="目标模型" min-width="120" />
+                                        <el-table-column prop="created_at" label="创建时间" min-width="180">
+                                            <template #default="scope">
+                                                {{ formatDate(scope.row.created_at) }}
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column label="操作" width="160" fixed="right">
+                                            <template #default="scope">
+                                                <el-button-group>
+                                                    <el-button 
+                                                        size="small" 
+                                                        type="primary" 
+                                                        :loading="scope.row.saving"
+                                                        @click="updateVoice(scope.row)"
+                                                    >
+                                                        保存
+                                                    </el-button>
+                                                    <el-popconfirm
+                                                        title="确定要删除这个音色吗？"
+                                                        @confirm="deleteVoice(scope.row)"
+                                                    >
+                                                        <template #reference>
+                                                            <el-button 
+                                                                size="small" 
+                                                                type="danger" 
+                                                                :loading="scope.row.deleting"
+                                                            >
+                                                                删除
+                                                            </el-button>
+                                                        </template>
+                                                    </el-popconfirm>
+                                                </el-button-group>
+                                            </template>
+                                        </el-table-column>
+                                    </el-table>
+                                </div>
+                            </el-tab-pane>
+                            <el-tab-pane label="数字人管理" name="avatars">
+                                <div v-if="!avatarList || avatarList.length === 0">
+                                    <el-empty description="暂无数字人数据" />
+                                </div>
+                                <div v-else>
+                                    <el-table :data="avatarList" style="width: 100%" v-loading="avatarLoading">
+                                        <el-table-column 
+                                            label="数字人ID" 
+                                            min-width="180" 
+                                            show-overflow-tooltip
+                                        >
+                                            <template #default="scope">
+                                                {{ scope.row.avatar_id }}
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column prop="file_url" label="文件路径" min-width="200" show-overflow-tooltip>
+                                            <template #default="scope">
+                                                <el-link v-if="scope.row.file_url" type="primary" :href="scope.row.file_url" target="_blank">
+                                                    {{ scope.row.file_url }}
+                                                </el-link>
+                                                <span v-else>处理中</span>
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column prop="name" label="名称" min-width="120">
+                                            <template #default="scope">
+                                                <el-input 
+                                                    v-model="scope.row.name" 
+                                                    size="small"
+                                                    placeholder="请输入名称"
+                                                    @change="value => handleAvatarNameChange(scope.row, value)"
+                                                />
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column prop="status" label="状态" min-width="180">
+                                            <template #default="scope">
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <el-tag
+                                                        :type="getStatusType(scope.row.status)"
+                                                        size="small"
+                                                    >
+                                                        {{ getStatusText(scope.row.status) }}
+                                                    </el-tag>
+                                                    <el-progress
+                                                        v-if="scope.row.status === 'processing'"
+                                                        :percentage="scope.row.progress || 0"
+                                                        :stroke-width="15"
+                                                        :show-text="true"
+                                                        style="flex: 1; margin-left: 8px;"
+                                                    />
+                                                    <el-tooltip
+                                                        v-if="scope.row.error_message"
+                                                        :content="scope.row.error_message"
+                                                        placement="top"
+                                                    >
+                                                        <el-icon class="error-icon" style="color: #F56C6C; cursor: pointer;">
+                                                            <warning />
+                                                        </el-icon>
+                                                    </el-tooltip>
+                                                </div>
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column prop="created_at" label="创建时间" min-width="180">
+                                            <template #default="scope">
+                                                {{ formatDate(scope.row.created_at) }}
+                                            </template>
+                                        </el-table-column>
+                                        <el-table-column label="操作" width="160" fixed="right">
+                                            <template #default="scope">
+                                                <el-button-group>
+                                                    <el-button 
+                                                        size="small" 
+                                                        type="primary" 
+                                                        :loading="scope.row.saving"
+                                                        @click="updateAvatar(scope.row)"
+                                                        :disabled="scope.row.status === 'processing'"
+                                                    >
+                                                        保存
+                                                    </el-button>
+                                                    <el-popconfirm
+                                                        title="确定要删除这个数字人吗？"
+                                                        @confirm="deleteAvatar(scope.row)"
+                                                    >
+                                                        <template #reference>
+                                                            <el-button 
+                                                                size="small" 
+                                                                type="danger" 
+                                                                :loading="scope.row.deleting"
+                                                                :disabled="scope.row.status === 'processing'"
+                                                            >
+                                                                删除
+                                                            </el-button>
+                                                        </template>
+                                                    </el-popconfirm>
+                                                </el-button-group>
+                                            </template>
+                                        </el-table-column>
+                                    </el-table>
+                                </div>
+                            </el-tab-pane>
+                        </el-tabs>
                     </div>
                 </el-main>
             </el-container>
@@ -678,8 +921,20 @@
     </div>
 
     <script>
-        const { createApp, ref, onMounted, onUnmounted } = Vue;
+        const { createApp, ref, onMounted, onUnmounted, watch, computed } = Vue;
         const { ElMessage } = ElementPlus;
+        const host = 'http://localhost:8001';
+        
+        // 导入所需的图标组件
+        const IconMenu = ElementPlusIconsVue.Menu;
+        const IconArrowLeft = ElementPlusIconsVue.ArrowLeft;
+        const IconMicrophone = ElementPlusIconsVue.Microphone;
+        const IconAvatar = ElementPlusIconsVue.Avatar;
+        const IconDocument = ElementPlusIconsVue.Document;
+        const IconUpload = ElementPlusIconsVue.Upload;
+        const IconUploadFilled = ElementPlusIconsVue.UploadFilled;
+        const IconUser = ElementPlusIconsVue.User;
+        const IconVideoCamera = ElementPlusIconsVue.VideoCamera;
         
         const app = createApp({
             setup() {
@@ -700,6 +955,11 @@
                 const avatarFileInfo = ref(null);
                 const voiceResult = ref(null);
                 const avatarResult = ref(null);
+                const manageTab = ref('voices');
+                const voiceList = ref([]);
+                const avatarList = ref([]);
+                const voiceLoading = ref(false);
+                const avatarLoading = ref(false);
 
                 onMounted(() => {
                     AOS.init({
@@ -707,6 +967,10 @@
                         easing: 'ease-out-cubic',
                         once: true
                     });
+                    if (activeTab.value === 'manage') {
+                        fetchVoices();
+                        fetchAvatars();
+                    }
                 });
 
                 const handleSelect = (key) => {
@@ -725,16 +989,17 @@
                     if (sizeMB > 50) {
                         voiceFileInfo.value = {
                             type: 'error',
-                            message: `文件大小 ${sizeMB.toFixed(2)}MB 超过50MB限制`
+                            message: `文件大小 ${sizeMB.toFixed(2)}MB 超过50MB限制`,
+                            raw: null
                         };
                         audioPreview.value = null;
                         return false;
                     }
                     voiceFileInfo.value = {
                         type: 'success',
-                        message: `文件大小: ${sizeMB.toFixed(2)}MB`
+                        message: `文件大小: ${sizeMB.toFixed(2)}MB`,
+                        raw: file.raw
                     };
-                    
                     // 创建音频预览URL
                     if (audioPreview.value) {
                         URL.revokeObjectURL(audioPreview.value);
@@ -747,16 +1012,17 @@
                     if (sizeMB > 200) {
                         avatarFileInfo.value = {
                             type: 'error',
-                            message: `文件大小 ${sizeMB.toFixed(2)}MB 超过200MB限制`
+                            message: `文件大小 ${sizeMB.toFixed(2)}MB 超过200MB限制`,
+                            raw: null
                         };
                         videoPreview.value = null;
                         return false;
                     }
                     avatarFileInfo.value = {
                         type: 'success',
-                        message: `文件大小: ${sizeMB.toFixed(2)}MB`
+                        message: `文件大小: ${sizeMB.toFixed(2)}MB`,
+                        raw: file.raw
                     };
-                    
                     // 创建视频预览URL
                     if (videoPreview.value) {
                         URL.revokeObjectURL(videoPreview.value);
@@ -783,29 +1049,28 @@
                 };
 
                 const submitVoiceForm = async () => {
-                    if (!voiceFileInfo.value) {
+                    if (!voiceFileInfo.value || !voiceFileInfo.value.raw) {
                         ElMessage.warning('请先选择要上传的音频文件');
                         return;
                     }
-                    
                     uploading.value = true;
                     try {
                         const formData = new FormData();
-                        // 添加表单数据
-                        const response = await fetch('/upload_voice', {
+                        formData.append('file', voiceFileInfo.value.raw);
+                        formData.append('prefix', voiceForm.value.prefix || '');
+                        formData.append('targetModel', voiceForm.value.targetModel || '');
+                        const response = await fetch(host + '/upload_voice', {
                             method: 'POST',
                             body: formData
                         });
                         const data = await response.json();
-                        
                         voiceResult.value = {
                             title: data.status === 'success' ? '上传成功！' : '上传失败',
                             type: data.status === 'success' ? 'success' : 'error',
                             message: data.status === 'success' 
-                                ? `音色ID: ${data.voice_id}\n文件URL: ${data.file_url}`
-                                : `错误信息: ${data.message}`
+                                ? `音色ID: ${data.voice_id}\n文件URL: ${data.file_url}`.replace(/\n/g, '<br>')
+                                : `错误信息: ${data.message}`.replace(/\n/g, '<br>')
                         };
-
                         if (data.status === 'success') {
                             ElMessage.success('音色创建成功！');
                         }
@@ -813,7 +1078,7 @@
                         voiceResult.value = {
                             title: '上传失败',
                             type: 'error',
-                            message: `错误信息: ${error.message}`
+                            message: `错误信息: ${error.message}`.replace(/\n/g, '<br>')
                         };
                         ElMessage.error('上传过程中发生错误');
                     } finally {
@@ -821,49 +1086,303 @@
                     }
                 };
 
+                const getStatusType = (status) => {
+                    switch (status) {
+                        case 'pending':
+                            return 'info';
+                        case 'processing':
+                            return 'warning';
+                        case 'completed':
+                            return 'success';
+                        case 'failed':
+                            return 'danger';
+                        default:
+                            return 'info';
+                    }
+                };
+
+                const getStatusText = (status) => {
+                    switch (status) {
+                        case 'pending':
+                            return '等待处理';
+                        case 'processing':
+                            return '处理中';
+                        case 'completed':
+                            return '已完成';
+                        case 'failed':
+                            return '处理失败';
+                        default:
+                            return '未知状态';
+                    }
+                };
+
+                // 轮询检查状态的函数
+                const pollAvatarStatus = async (avatar_id) => {
+                    try {
+                        const res = await fetch(host + `/avatar_status/${avatar_id}`);
+                        if (!res.ok) {
+                            throw new Error(`HTTP error! status: ${res.status}`);
+                        }
+                        const data = await res.json();
+                        if (data.status === 'success') {
+                            // 更新列表中对应项的状态
+                            const index = avatarList.value.findIndex(item => item.avatar_id === avatar_id);
+                            if (index !== -1) {
+                                const avatar = avatarList.value[index];
+                                avatar.status = data.data.status;
+                                avatar.progress = data.data.progress;
+                                avatar.error_message = data.data.error_message;
+                                avatar.file_url = data.data.file_url;
+
+                                // 如果状态是processing，继续轮询
+                                if (data.data.status === 'processing') {
+                                    setTimeout(() => pollAvatarStatus(avatar_id), 2000);
+                                } else if (data.data.status === 'completed') {
+                                    ElMessage.success('数字人生成完成！');
+                                } else if (data.data.status === 'failed') {
+                                    ElMessage.error(`数字人生成失败: ${data.data.error_message}`);
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error polling avatar status:', error);
+                    }
+                };
+
                 const submitAvatarForm = async () => {
-                    if (!avatarFileInfo.value) {
+                    if (!avatarFileInfo.value || !avatarFileInfo.value.raw) {
                         ElMessage.warning('请先选择要上传的视频文件');
                         return;
                     }
-
                     if (!avatarForm.value.name) {
                         ElMessage.warning('请输入形象名称');
                         return;
                     }
-                    
                     avatarUploading.value = true;
                     try {
                         const formData = new FormData();
-                        // 添加表单数据
-                        const response = await fetch('/upload_avatar', {
+                        formData.append('file', avatarFileInfo.value.raw);
+                        formData.append('name', avatarForm.value.name || '');
+                        const response = await fetch(host + '/upload_avatar', {
                             method: 'POST',
                             body: formData
                         });
                         const data = await response.json();
-                        
-                        avatarResult.value = {
-                            title: data.status === 'success' ? '上传成功！' : '上传失败',
-                            type: data.status === 'success' ? 'success' : 'error',
-                            message: data.status === 'success' 
-                                ? `形象ID: ${data.avatar_id}\n文件URL: ${data.file_url}`
-                                : `错误信息: ${data.message}`
-                        };
-
                         if (data.status === 'success') {
-                            ElMessage.success('形象创建成功！');
+                            ElMessage.success(data.message);
+                            // 开始轮询状态
+                            pollAvatarStatus(data.avatar_id);
+                            // 刷新列表
+                            await fetchAvatars();
+                        } else {
+                            ElMessage.error(data.message);
                         }
                     } catch (error) {
-                        avatarResult.value = {
-                            title: '上传失败',
-                            type: 'error',
-                            message: `错误信息: ${error.message}`
-                        };
+                        console.error('Error uploading avatar:', error);
                         ElMessage.error('上传过程中发生错误');
                     } finally {
                         avatarUploading.value = false;
                     }
                 };
+
+                const formatDate = (dateStr) => {
+                    if (!dateStr) return '';
+                    const date = new Date(dateStr);
+                    return date.toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    });
+                };
+
+                const handleTabClick = (tab) => {
+                    if (tab.props.name === 'voices') {
+                        fetchVoices();
+                    } else if (tab.props.name === 'avatars') {
+                        fetchAvatars();
+                    }
+                };
+
+                const handleVoicePrefixChange = (row, value) => {
+                    row.prefix = value;
+                    row.modified = true;
+                };
+
+                const handleAvatarNameChange = (row, value) => {
+                    row.name = value;
+                    row.modified = true;
+                };
+
+                const fetchVoices = async () => {
+                    voiceLoading.value = true;
+                    try {
+                        const res = await fetch(host + '/list_voices');
+                        if (!res.ok) {
+                            throw new Error(`HTTP error! status: ${res.status}`);
+                        }
+                        const data = await res.json();
+                        console.log('Fetched voices data:', data);
+                        if (!Array.isArray(data)) {
+                            throw new Error('Invalid data format received');
+                        }
+                        voiceList.value = data.map(item => ({
+                            ...item,
+                            saving: false,
+                            deleting: false,
+                            modified: false
+                        }));
+                        console.log('Processed voices data:', voiceList.value);
+                    } catch (error) {
+                        console.error('Error fetching voices:', error);
+                        ElMessage.error('获取音色列表失败');
+                        voiceList.value = [];
+                    } finally {
+                        voiceLoading.value = false;
+                    }
+                };
+
+                const fetchAvatars = async () => {
+                    avatarLoading.value = true;
+                    try {
+                        const res = await fetch(host + '/list_avatars');
+                        if (!res.ok) {
+                            throw new Error(`HTTP error! status: ${res.status}`);
+                        }
+                        const data = await res.json();
+                        if (!Array.isArray(data)) {
+                            throw new Error('Invalid data format received');
+                        }
+                        avatarList.value = data.map(item => ({
+                            ...item,
+                            saving: false,
+                            deleting: false,
+                            modified: false
+                        }));
+                    } catch (error) {
+                        console.error('Error fetching avatars:', error);
+                        ElMessage.error('获取数字人列表失败');
+                        avatarList.value = [];
+                    } finally {
+                        avatarLoading.value = false;
+                    }
+                };
+
+                const updateVoice = async (row) => {
+                    if (!row.modified) {
+                        ElMessage.info('数据未修改');
+                        return;
+                    }
+                    row.saving = true;
+                    try {
+                        const formData = new FormData();
+                        formData.append('id', row.id);
+                        formData.append('prefix', row.prefix);
+                        const res = await fetch(host + '/update_voice', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        if (!res.ok) {
+                            throw new Error(`HTTP error! status: ${res.status}`);
+                        }
+                        ElMessage.success('音色信息已更新');
+                        row.modified = false;
+                    } catch (error) {
+                        console.error('Error updating voice:', error);
+                        ElMessage.error('更新音色失败');
+                    } finally {
+                        row.saving = false;
+                    }
+                };
+
+                const deleteVoice = async (row) => {
+                    row.deleting = true;
+                    try {
+                        const res = await fetch(host + `/delete_voice/${row.voice_id}`, {
+                            method: 'DELETE'
+                        });
+                        if (!res.ok) {
+                            throw new Error(`HTTP error! status: ${res.status}`);
+                        }
+                        ElMessage.success('音色已删除');
+                        await fetchVoices();
+                    } catch (error) {
+                        console.error('Error deleting voice:', error);
+                        ElMessage.error('删除音色失败');
+                    } finally {
+                        row.deleting = false;
+                    }
+                };
+
+                const updateAvatar = async (row) => {
+                    if (!row.modified) {
+                        ElMessage.info('数据未修改');
+                        return;
+                    }
+                    row.saving = true;
+                    try {
+                        const formData = new FormData();
+                        formData.append('id', row.id);
+                        formData.append('name', row.name);
+                        const res = await fetch(host + '/update_avatar', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        if (!res.ok) {
+                            throw new Error(`HTTP error! status: ${res.status}`);
+                        }
+                        ElMessage.success('数字人信息已更新');
+                        row.modified = false;
+                    } catch (error) {
+                        console.error('Error updating avatar:', error);
+                        ElMessage.error('更新数字人失败');
+                    } finally {
+                        row.saving = false;
+                    }
+                };
+
+                const deleteAvatar = async (row) => {
+                    row.deleting = true;
+                    try {
+                        const res = await fetch(host + `/delete_avatar/${row.avatar_id}`, {
+                            method: 'DELETE'
+                        });
+                        if (!res.ok) {
+                            throw new Error(`HTTP error! status: ${res.status}`);
+                        }
+                        ElMessage.success('数字人已删除');
+                        await fetchAvatars();
+                    } catch (error) {
+                        console.error('Error deleting avatar:', error);
+                        ElMessage.error('删除数字人失败');
+                    } finally {
+                        row.deleting = false;
+                    }
+                };
+
+                const copyToClipboard = async (text) => {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        ElMessage.success('已复制到剪贴板');
+                    } catch (err) {
+                        console.error('复制失败:', err);
+                        ElMessage.error('复制失败');
+                    }
+                };
+
+                // 切换到管理tab时自动刷新
+                watch(() => activeTab.value, (val) => {
+                    if (val === 'manage') {
+                        if (manageTab.value === 'voices') {
+                            fetchVoices();
+                        } else {
+                            fetchAvatars();
+                        }
+                    }
+                });
 
                 // 组件卸载时清理资源
                 onUnmounted(() => {
@@ -895,10 +1414,39 @@
                     beforeVoiceUpload,
                     beforeAvatarUpload,
                     submitVoiceForm,
-                    submitAvatarForm
+                    submitAvatarForm,
+                    manageTab,
+                    voiceList,
+                    avatarList,
+                    voiceLoading,
+                    avatarLoading,
+                    formatDate,
+                    handleTabClick,
+                    handleVoicePrefixChange,
+                    handleAvatarNameChange,
+                    fetchVoices,
+                    fetchAvatars,
+                    updateVoice,
+                    deleteVoice,
+                    updateAvatar,
+                    deleteAvatar,
+                    copyToClipboard,
+                    getStatusType,
+                    getStatusText
                 };
             }
         });
+
+        // 注册图标组件
+        app.component('Menu', IconMenu);
+        app.component('ArrowLeft', IconArrowLeft);
+        app.component('Microphone', IconMicrophone);
+        app.component('Avatar', IconAvatar);
+        app.component('Document', IconDocument);
+        app.component('Upload', IconUpload);
+        app.component('UploadFilled', IconUploadFilled);
+        app.component('User', IconUser);
+        app.component('VideoCamera', IconVideoCamera);
 
         app.use(ElementPlus);
         app.mount('#app');
