@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
@@ -12,6 +12,12 @@ from datetime import datetime
 import asyncio
 import threading
 from typing import Optional
+import queue
+from pydantic import BaseModel
+from collections import deque
+import json
+import signal
+import psutil
 
 load_dotenv()
 app = FastAPI()
@@ -58,6 +64,18 @@ logger.info(f"COS_SECRET_ID: {COS_SECRET_ID}")
 logger.info(f"COS_SECRET_KEY: {COS_SECRET_KEY}")
 logger.info(f"COS_REGION: {COS_REGION}")
 logger.info(f"COS_BUCKET: {COS_BUCKET}")
+
+# 使用 deque 存储最近的100条日志
+MAX_LOGS = 100
+service_logs = deque(maxlen=MAX_LOGS)
+service_process = None
+log_thread = None
+service_port = 6006
+
+class ServiceConfig(BaseModel):
+    voice_id: str
+    avatar_id: str
+    extra_params: str = ""
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -391,7 +409,19 @@ def list_avatars():
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute("SELECT id, avatar_id, file_url, name, created_at FROM avatars ORDER BY created_at DESC")
+        c.execute("""
+            SELECT 
+                id, 
+                avatar_id, 
+                file_url, 
+                name, 
+                status,
+                progress,
+                error_message,
+                created_at 
+            FROM avatars 
+            ORDER BY created_at DESC
+        """)
         rows = c.fetchall()
         conn.close()
         
@@ -404,7 +434,10 @@ def list_avatars():
                 "avatar_id": row[1],
                 "file_url": row[2],
                 "name": row[3],
-                "created_at": row[4]
+                "status": row[4] or "pending",  # 如果为 NULL 则默认为 pending
+                "progress": row[5] or 0,        # 如果为 NULL 则默认为 0
+                "error_message": row[6],        # 保持 NULL 如果没有错误
+                "created_at": row[7]
             }
             for row in rows
         ]
@@ -443,13 +476,275 @@ def update_voice(id: int = Form(...), prefix: str = Form(...)):
     return {"status": "success"}
 
 @app.post("/update_avatar")
-def update_avatar(id: int = Form(...), name: str = Form(...)):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("UPDATE avatars SET name = ? WHERE id = ?", (name, id))
-    conn.commit()
-    conn.close()
-    return {"status": "success"}
+def update_avatar(
+    id: int = Form(...),
+    name: Optional[str] = Form(default=...),
+    avatar_id: Optional[str] = Form(default=...),
+    status: Optional[str] = Form(default=...),
+    progress: Optional[int] = Form(default=...),
+    error_message: Optional[str] = Form(default=...),
+    file_url: Optional[str] = Form(default=...)
+):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+
+        # 构建更新语句和参数
+        update_fields = []
+        params = []
+        
+        # 获取表单数据中实际包含的字段
+        form_data = {}
+        for key, value in {
+            'name': name,
+            'avatar_id': avatar_id,
+            'status': status,
+            'progress': progress,
+            'error_message': error_message,
+            'file_url': file_url
+        }.items():
+            # 如果参数在请求中出现（包括空值），则更新
+            if value is not Ellipsis:  # Ellipsis 表示参数未在请求中出现
+                form_data[key] = value
+                update_fields.append(f"{key} = ?")
+                params.append(value)
+            
+        if not update_fields:
+            return JSONResponse({
+                "status": "error",
+                "message": "没有提供需要更新的字段"
+            })
+            
+        # 添加 WHERE 条件的参数
+        params.append(id)
+        
+        # 构建并执行 SQL 语句
+        sql = f"UPDATE avatars SET {', '.join(update_fields)} WHERE id = ?"
+        logger.info(f"Executing SQL: {sql} with params: {params}")
+        logger.info(f"Updating fields: {form_data}")
+        
+        c.execute(sql, params)
+        conn.commit()
+        conn.close()
+        
+        return {
+            "status": "success",
+            "updated_fields": form_data  # 返回实际更新的字段
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in update_avatar: {str(e)}")
+        return JSONResponse({
+            "status": "error",
+            "message": str(e)
+        })
+
+def log_reader(process, log_queue):
+    while True:
+        output = process.stdout.readline()
+        if output == '' and process.poll() is not None:
+            break
+        if output:
+            # 添加时间戳
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            log_entry = {
+                'timestamp': timestamp,
+                'message': output.strip(),
+                'type': 'info'  # 可以根据输出内容判断类型
+            }
+            log_queue.append(log_entry)
+    
+    # 添加进程结束的日志
+    if process.poll() is not None:
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        log_entry = {
+            'timestamp': timestamp,
+            'message': f'服务进程已结束，返回值: {process.poll()}',
+            'type': 'info' if process.poll() == 0 else 'error'
+        }
+        log_queue.append(log_entry)
+    
+    process.stdout.close()
+
+def kill_process_by_port(port):
+    """通过端口号杀死进程"""
+    try:
+        for proc in psutil.process_iter(['pid', 'name', 'connections']):
+            try:
+                connections = proc.connections()
+                for conn in connections:
+                    if conn.laddr.port == port:
+                        # 发送 SIGTERM 信号
+                        os.kill(proc.pid, signal.SIGTERM)
+                        # 等待进程结束
+                        psutil.Process(proc.pid).wait(timeout=3)
+                        return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+                continue
+    except Exception as e:
+        logger.error(f"Error killing process on port {port}: {str(e)}")
+    return False
+
+def cleanup_service():
+    """清理服务相关的所有资源"""
+    global service_process, log_thread
+    try:
+        # 1. 杀死可能占用端口的进程
+        kill_process_by_port(service_port)
+        
+        # 2. 如果进程还在运行，尝试终止它
+        if service_process:
+            try:
+                # 发送 SIGTERM 信号
+                service_process.terminate()
+                # 等待进程结束，最多等待5秒
+                try:
+                    service_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    # 如果等待超时，强制结束进程
+                    service_process.kill()
+                    service_process.wait()
+            except Exception as e:
+                logger.error(f"Error terminating service process: {str(e)}")
+        
+        # 3. 重置进程和线程变量
+        service_process = None
+        log_thread = None
+        
+        # 4. 清空日志
+        service_logs.clear()
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error in cleanup_service: {str(e)}")
+        return False
+
+@app.post("/start_service")
+def start_service(config: ServiceConfig):
+    global service_process, log_thread
+    try:
+        # 先清理旧的服务
+        cleanup_service()
+        
+        # 添加启动日志
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        service_logs.append({
+            'timestamp': timestamp,
+            'message': f'正在启动服务...\n参数: voice_id={config.voice_id}, avatar_id={config.avatar_id}',
+            'type': 'info'
+        })
+
+        # 构建命令
+        cmd = ["uv", "run", "app.py", 
+               "--voice_id_dashscope", config.voice_id,
+               "--avatar_id", config.avatar_id]
+        
+        # 添加额外参数
+        if config.extra_params:
+            extra_params = config.extra_params.strip().split('\n')
+            for param in extra_params:
+                param = param.strip()
+                if param:
+                    cmd.extend(param.split())
+
+        logger.info(f"Starting service with command: {' '.join(cmd)}")
+        service_logs.append({
+            'timestamp': timestamp,
+            'message': f'执行命令: {" ".join(cmd)}',
+            'type': 'info'
+        })
+        
+        # 启动服务进程
+        service_process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            bufsize=1,
+            cwd=BASE_DIR,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP  # Windows特定标志
+        )
+
+        # 启动日志读取线程
+        log_thread = threading.Thread(target=log_reader, args=(service_process, service_logs))
+        log_thread.daemon = True
+        log_thread.start()
+
+        return JSONResponse({
+            "status": "success",
+            "message": "服务已启动"
+        })
+
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error starting service: {error_msg}")
+        # 添加错误日志
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        service_logs.append({
+            'timestamp': timestamp,
+            'message': f'启动服务失败: {error_msg}',
+            'type': 'error'
+        })
+        return JSONResponse({
+            "status": "error",
+            "message": f"启动服务失败: {error_msg}"
+        })
+
+@app.post("/stop_service")
+def stop_service():
+    try:
+        if service_process is None:
+            return JSONResponse({
+                "status": "error",
+                "message": "服务未运行"
+            })
+
+        # 添加停止日志
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        service_logs.append({
+            'timestamp': timestamp,
+            'message': '正在停止服务...',
+            'type': 'info'
+        })
+
+        # 清理所有服务相关资源
+        if cleanup_service():
+            # 添加完成日志
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            service_logs.append({
+                'timestamp': timestamp,
+                'message': '服务已停止',
+                'type': 'info'
+            })
+
+            return JSONResponse({
+                "status": "success",
+                "message": "服务已停止"
+            })
+        else:
+            raise Exception("清理服务资源失败")
+
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error stopping service: {error_msg}")
+        # 添加错误日志
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        service_logs.append({
+            'timestamp': timestamp,
+            'message': f'停止服务失败: {error_msg}',
+            'type': 'error'
+        })
+        return JSONResponse({
+            "status": "error",
+            "message": f"停止服务失败: {error_msg}"
+        })
+
+@app.get("/service_logs")
+def get_service_logs():
+    return JSONResponse({
+        "status": "success",
+        "logs": list(service_logs)  # 转换 deque 为列表
+    })
 
 if __name__ == "__main__":
     import uvicorn

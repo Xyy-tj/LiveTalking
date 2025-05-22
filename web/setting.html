@@ -493,6 +493,86 @@
             top: 50%;
             transform: translateY(-50%);
         }
+
+        .service-status {
+            margin-top: 24px;
+        }
+
+        .service-status h3 {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            color: var(--primary-text);
+        }
+
+        .status-card .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .log-content {
+            background: #1e1e1e;
+            border-radius: 4px;
+            padding: 16px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .log-entry {
+            margin: 4px 0;
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+        }
+
+        .log-timestamp {
+            color: #888;
+            white-space: nowrap;
+            font-size: 12px;
+            min-width: 150px;
+        }
+
+        .log-message {
+            color: #fff;
+            word-wrap: break-word;
+            flex: 1;
+        }
+
+        .log-type-info {
+            color: #fff;
+        }
+
+        .log-type-error {
+            color: #ff6b6b;
+        }
+
+        .log-type-warning {
+            color: #ffd93d;
+        }
+
+        .preview-iframe {
+            width: 100%;
+            height: calc(100vh - 200px);
+            border: none;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .preview-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .preview-actions {
+            display: flex;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -520,6 +600,14 @@
                         <el-menu-item index="manage">
                             <el-icon><document /></el-icon>
                             <template #title>管理</template>
+                        </el-menu-item>
+                        <el-menu-item index="service">
+                            <el-icon><video-play /></el-icon>
+                            <template #title>服务管理</template>
+                        </el-menu-item>
+                        <el-menu-item index="preview">
+                            <el-icon><video-play /></el-icon>
+                            <template #title>实时预览</template>
                         </el-menu-item>
                     </el-menu>
                 </el-aside>
@@ -826,7 +914,17 @@
                                             show-overflow-tooltip
                                         >
                                             <template #default="scope">
-                                                {{ scope.row.avatar_id }}
+                                                <div class="voice-id-cell">
+                                                    <span class="voice-id-text">{{ scope.row.avatar_id }}</span>
+                                                    <div class="copy-button-wrapper">
+                                                        <div class="copy-button" @click.stop="copyToClipboard(scope.row.avatar_id)">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" style="fill: currentColor">
+                                                                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                                                            </svg>
+                                                            <span>复制</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </template>
                                         </el-table-column>
                                         <el-table-column prop="file_url" label="文件路径" min-width="200" show-overflow-tooltip>
@@ -915,6 +1013,160 @@
                             </el-tab-pane>
                         </el-tabs>
                     </div>
+
+                    <div v-show="activeTab === 'service'" class="upload-container" data-aos="fade-up">
+                        <h2 class="section-title">
+                            <el-icon><video-play /></el-icon>
+                            数字人服务管理
+                        </h2>
+
+                        <div class="feature-tags">
+                            <span class="feature-tag">
+                                <el-icon><connection /></el-icon>
+                                实时状态监控
+                            </span>
+                            <span class="feature-tag">
+                                <el-icon><setting /></el-icon>
+                                参数配置
+                            </span>
+                            <span class="feature-tag">
+                                <el-icon><video-play /></el-icon>
+                                一键启动
+                            </span>
+                        </div>
+
+                        <el-form :model="serviceForm" label-position="top" style="margin-top: 24px;">
+                            <el-form-item label="音色ID">
+                                <el-select 
+                                    v-model="serviceForm.voice_id" 
+                                    placeholder="请选择音色"
+                                    style="width: 100%;"
+                                    filterable
+                                >
+                                    <el-option
+                                        v-for="voice in voiceList"
+                                        :key="voice.voice_id"
+                                        :label="voice.prefix || voice.voice_id"
+                                        :value="voice.voice_id"
+                                    >
+                                        <span style="float: left">{{ voice.prefix || '未命名' }}</span>
+                                        <span style="float: right; color: #8492a6; font-size: 13px">
+                                            {{ voice.voice_id }}
+                                        </span>
+                                    </el-option>
+                                </el-select>
+                            </el-form-item>
+
+                            <el-form-item label="数字人ID">
+                                <el-select 
+                                    v-model="serviceForm.avatar_id" 
+                                    placeholder="请选择数字人"
+                                    style="width: 100%;"
+                                    filterable
+                                >
+                                    <el-option
+                                        v-for="avatar in avatarList"
+                                        :key="avatar.avatar_id"
+                                        :label="avatar.name || avatar.avatar_id"
+                                        :value="avatar.avatar_id"
+                                        :disabled="avatar.status !== 'completed'"
+                                    >
+                                        <span style="float: left">{{ avatar.name || '未命名' }}</span>
+                                        <span style="float: right; color: #8492a6; font-size: 13px">
+                                            {{ avatar.avatar_id }}
+                                        </span>
+                                    </el-option>
+                                </el-select>
+                            </el-form-item>
+
+                            <el-form-item label="其他参数">
+                                <el-input
+                                    v-model="serviceForm.extraParams"
+                                    type="textarea"
+                                    :rows="3"
+                                    placeholder="每行一个参数，格式：--参数名 参数值"
+                                />
+                            </el-form-item>
+
+                            <el-form-item>
+                                <el-button 
+                                    type="primary" 
+                                    :loading="serviceForm.starting" 
+                                    @click="startService"
+                                    :disabled="!serviceForm.voice_id || !serviceForm.avatar_id"
+                                >
+                                    {{ serviceForm.running ? '停止服务' : '启动服务' }}
+                                </el-button>
+                            </el-form-item>
+                        </el-form>
+
+                        <div v-if="serviceForm.running" class="service-status">
+                            <h3>服务状态</h3>
+                            <el-card class="status-card">
+                                <template #header>
+                                    <div class="card-header">
+                                        <span>运行信息</span>
+                                        <el-tag type="success" size="small">运行中</el-tag>
+                                    </div>
+                                </template>
+                                <div class="log-content">
+                                    <pre v-html="serviceForm.logs"></pre>
+                                </div>
+                            </el-card>
+                        </div>
+                    </div>
+
+                    <div v-show="activeTab === 'preview'" class="upload-container" data-aos="fade-up">
+                        <h2 class="section-title">
+                            <el-icon><video-play /></el-icon>
+                            实时预览
+                        </h2>
+
+                        <div class="feature-tags">
+                            <span class="feature-tag">
+                                <el-icon><video-camera /></el-icon>
+                                实时画面
+                            </span>
+                            <span class="feature-tag">
+                                <el-icon><microphone /></el-icon>
+                                实时音频
+                            </span>
+                            <span class="feature-tag">
+                                <el-icon><connection /></el-icon>
+                                低延迟
+                            </span>
+                        </div>
+
+                        <div class="preview-container">
+                            <div class="preview-header">
+                                <h3 style="margin: 0;">预览窗口</h3>
+                                <div class="preview-actions">
+                                    <el-button 
+                                        type="primary" 
+                                        size="small" 
+                                        @click="refreshPreview"
+                                        :icon="Refresh"
+                                    >
+                                        刷新
+                                    </el-button>
+                                    <el-button 
+                                        type="primary" 
+                                        size="small" 
+                                        @click="openInNewWindow"
+                                        :icon="Link"
+                                    >
+                                        新窗口打开
+                                    </el-button>
+                                </div>
+                            </div>
+                            <iframe 
+                                ref="previewFrame"
+                                class="preview-iframe" 
+                                :src="previewUrl"
+                                allow="camera; microphone; fullscreen"
+                            ></iframe>
+                        </div>
+                    </div>
                 </el-main>
             </el-container>
         </div>
@@ -935,6 +1187,8 @@
         const IconUploadFilled = ElementPlusIconsVue.UploadFilled;
         const IconUser = ElementPlusIconsVue.User;
         const IconVideoCamera = ElementPlusIconsVue.VideoCamera;
+        const IconRefresh = ElementPlusIconsVue.Refresh;
+        const IconLink = ElementPlusIconsVue.Link;
         
         const app = createApp({
             setup() {
@@ -960,6 +1214,16 @@
                 const avatarList = ref([]);
                 const voiceLoading = ref(false);
                 const avatarLoading = ref(false);
+                const serviceForm = ref({
+                    voice_id: '',
+                    avatar_id: '',
+                    extraParams: '',
+                    running: false,
+                    starting: false,
+                    logs: ''
+                });
+                const previewUrl = ref('http://localhost:6006/rtcpushchat.html');
+                const previewFrame = ref(null);
 
                 onMounted(() => {
                     AOS.init({
@@ -1326,7 +1590,13 @@
                     try {
                         const formData = new FormData();
                         formData.append('id', row.id);
-                        formData.append('name', row.name);
+                        // 只发送修改过的字段
+                        if (row.name !== undefined) formData.append('name', row.name);
+                        if (row.status !== undefined) formData.append('status', row.status);
+                        if (row.progress !== undefined) formData.append('progress', row.progress);
+                        if (row.error_message !== undefined) formData.append('error_message', row.error_message);
+                        if (row.file_url !== undefined) formData.append('file_url', row.file_url);
+                        
                         const res = await fetch(host + '/update_avatar', {
                             method: 'POST',
                             body: formData
@@ -1334,8 +1604,13 @@
                         if (!res.ok) {
                             throw new Error(`HTTP error! status: ${res.status}`);
                         }
-                        ElMessage.success('数字人信息已更新');
-                        row.modified = false;
+                        const data = await res.json();
+                        if (data.status === 'success') {
+                            ElMessage.success('数字人信息已更新');
+                            row.modified = false;
+                        } else {
+                            throw new Error(data.message);
+                        }
                     } catch (error) {
                         console.error('Error updating avatar:', error);
                         ElMessage.error('更新数字人失败');
@@ -1373,6 +1648,98 @@
                     }
                 };
 
+                // 启动服务
+                const startService = async () => {
+                    if (serviceForm.value.running) {
+                        // 停止服务
+                        try {
+                            const response = await fetch(host + '/stop_service', {
+                                method: 'POST'
+                            });
+                            const data = await response.json();
+                            if (data.status === 'success') {
+                                ElMessage.success('服务已停止');
+                                serviceForm.value.running = false;
+                                serviceForm.value.logs = '';
+                            } else {
+                                ElMessage.error(data.message);
+                            }
+                        } catch (error) {
+                            console.error('Error stopping service:', error);
+                            ElMessage.error('停止服务失败');
+                        }
+                        return;
+                    }
+
+                    if (!serviceForm.value.voice_id || !serviceForm.value.avatar_id) {
+                        ElMessage.warning('请选择音色和数字人');
+                        return;
+                    }
+
+                    serviceForm.value.starting = true;
+                    try {
+                        const params = {
+                            voice_id: serviceForm.value.voice_id,
+                            avatar_id: serviceForm.value.avatar_id,
+                            extra_params: serviceForm.value.extraParams
+                        };
+
+                        const response = await fetch(host + '/start_service', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(params)
+                        });
+
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            ElMessage.success('服务已启动');
+                            serviceForm.value.running = true;
+                            // 开始轮询日志
+                            pollServiceLogs();
+                        } else {
+                            ElMessage.error(data.message);
+                        }
+                    } catch (error) {
+                        console.error('Error starting service:', error);
+                        ElMessage.error('启动服务失败');
+                    } finally {
+                        serviceForm.value.starting = false;
+                    }
+                };
+
+                // 轮询服务日志
+                const pollServiceLogs = async () => {
+                    if (!serviceForm.value.running) return;
+
+                    try {
+                        const response = await fetch(host + '/service_logs');
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            // 格式化日志显示
+                            const formattedLogs = data.logs.map(log => `
+                                <div class="log-entry">
+                                    <span class="log-timestamp">${log.timestamp}</span>
+                                    <span class="log-message log-type-${log.type}">${log.message}</span>
+                                </div>
+                            `).join('');
+                            
+                            serviceForm.value.logs = formattedLogs;
+                            
+                            // 如果服务仍在运行，继续轮询
+                            if (serviceForm.value.running) {
+                                setTimeout(pollServiceLogs, 1000);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error polling service logs:', error);
+                        if (serviceForm.value.running) {
+                            setTimeout(pollServiceLogs, 1000);
+                        }
+                    }
+                };
+
                 // 切换到管理tab时自动刷新
                 watch(() => activeTab.value, (val) => {
                     if (val === 'manage') {
@@ -1393,6 +1760,16 @@
                         URL.revokeObjectURL(videoPreview.value);
                     }
                 });
+
+                const refreshPreview = () => {
+                    if (previewFrame.value) {
+                        previewFrame.value.src = previewUrl.value;
+                    }
+                };
+
+                const openInNewWindow = () => {
+                    window.open(previewUrl.value, '_blank');
+                };
 
                 return {
                     isCollapse,
@@ -1432,7 +1809,15 @@
                     deleteAvatar,
                     copyToClipboard,
                     getStatusType,
-                    getStatusText
+                    getStatusText,
+                    serviceForm,
+                    startService,
+                    previewUrl,
+                    previewFrame,
+                    refreshPreview,
+                    openInNewWindow,
+                    Refresh: IconRefresh,
+                    Link: IconLink
                 };
             }
         });
@@ -1447,6 +1832,8 @@
         app.component('UploadFilled', IconUploadFilled);
         app.component('User', IconUser);
         app.component('VideoCamera', IconVideoCamera);
+        app.component('Refresh', IconRefresh);
+        app.component('Link', IconLink);
 
         app.use(ElementPlus);
         app.mount('#app');

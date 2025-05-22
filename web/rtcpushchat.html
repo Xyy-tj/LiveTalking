@@ -261,9 +261,10 @@ $(document).ready(function() {
             // User should set the stream when publish is done
             $('#rtc_media_player').prop('srcObject', sdk.stream);
 
-            var host = "124.223.167.54"
-            var url = "http://"+host+":1985/rtc/v1/whep/?app=live&stream=livestream"
-            sdk.play(url).then(function(session){
+            // 使用代理服务器地址
+            const srsServerUrl = "http://localhost:8002/proxy/rtc/v1/whep/?app=live&stream=livestream";
+
+            sdk.play(srsServerUrl).then(function(session){
                 // Success callback
             }).catch(function (reason) {
                 sdk.close();
