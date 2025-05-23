@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LiveTalking 服务管理面板</title>
-    <link rel="icon" href="web/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
     <!-- 引入 Vue 3 生产版本 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <!-- 引入 Element Plus -->
@@ -574,11 +574,94 @@
             display: flex;
             gap: 8px;
         }
+
+        /* Authorization Screen Styles */
+        .auth-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: var(--page-background);
+            padding: 20px;
+        }
+
+        .auth-card {
+            width: 100%;
+            max-width: 480px; /* Increased width for better layout */
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1); /* Enhanced shadow */
+        }
+
+        .auth-card .card-header span {
+            font-size: 22px; /* Slightly larger */
+            font-weight: 600;
+            color: var(--primary-text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .auth-card .el-form-item__label {
+            font-size: 14px !important; /* Ensure consistency */
+            margin-bottom: 8px !important;
+        }
+
+        .auth-card .el-input__wrapper {
+             max-width: none; /* Override previous max-width for this specific input */
+        }
+
+        .auth-form-actions {
+            margin-top: 24px;
+        }
+        
+        .auth-tip {
+            margin-top: 24px;
+            font-size: 13px;
+            color: var(--secondary-text);
+        }
+
+        /* Re-authorize button style */
+        .reauth-button-container {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            padding: 0 10px; 
+            box-sizing: border-box;
+        }
+
+        .sidebar.collapsed .reauth-button-container {
+            padding: 0 4px; /* Adjust for collapsed state */
+        }
+        
+        .sidebar .reauth-button-container .el-button {
+            width: 100%;
+            max-width: calc(100% - 16px); /* Ensure padding within button container */
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .sidebar:not(.collapsed) .reauth-button-container .el-button .el-icon + span {
+            margin-left: 8px;
+        }
+
+        .sidebar.collapsed .reauth-button-container .el-button span:not(.el-icon) {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div id="app">
-        <div class="page-container">
+        <!-- Authorization Screen -->
+        <!-- <div v-if="!isAuthorized" class="auth-screen" data-aos="fade-in"> ... </div> -->
+
+        <!-- Main Application Content -->
+        <!-- <div v-else class="page-container"> --> <!-- v-else removed -->
+        <div class="page-container"> <!-- Always show main container, backend handles redirection -->
             <el-container>
                 <el-aside :width="isCollapse ? '64px' : '240px'" class="sidebar" :class="{ collapsed: isCollapse }">
                     <div class="sidebar-title">Digital Human Panel</div>
@@ -611,6 +694,17 @@
                             <template #title>实时预览</template>
                         </el-menu-item>
                     </el-menu>
+                    <!-- Re-authorize Button -->
+                    <div class="reauth-button-container" v-if="!isCollapse">
+                        <el-button type="warning" :icon="Unlock" @click="goToReauth" plain>
+                            重新授权
+                        </el-button>
+                    </div>
+                     <div class="reauth-button-container" v-if="isCollapse">
+                        <el-tooltip content="重新授权" placement="right">
+                            <el-button type="warning" :icon="Unlock" @click="goToReauth" plain circle />
+                        </el-tooltip>
+                    </div>
                 </el-aside>
                 
                 <el-main class="main-content">
@@ -1192,6 +1286,7 @@
         const IconLink = ElementPlusIconsVue.Link;
         const IconVideoPlay = ElementPlusIconsVue.VideoPlay;
         const IconSetting = ElementPlusIconsVue.Setting;
+        const IconUnlock = ElementPlusIconsVue.Unlock;
         
         const app = createApp({
             setup() {
@@ -1234,9 +1329,41 @@
                         easing: 'ease-out-cubic',
                         once: true
                     });
+                    // checkAuthorizationOnLoad(); // REMOVED - Backend handles this
+                    // Fetch initial data directly. If auth fails, API calls will trigger error handling.
                     fetchVoices();
                     fetchAvatars();
                 });
+
+                const goToReauth = () => {
+                    ElMessage.info('正在跳转到授权页面...');
+                    window.location.href = '/logout_and_reauth';
+                };
+
+                // Simplified fetch wrapper to handle common API errors including auth
+                const simplifiedFetch = async (endpoint, options = {}) => {
+                    try {
+                        const response = await fetch(host + endpoint, options);
+                        if (!response.ok) {
+                            if (response.status === 401 || response.status === 403) {
+                                ElMessage.error('授权已失效或访问被拒绝，请重新授权。');
+                                // Consider a more prominent way to guide user, e.g., a modal with a button to goToReauth()
+                                // For now, a message and they can use the re-auth button.
+                                throw new Error('AUTH_FAILURE'); 
+                            }
+                            const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
+                            throw new Error(errorData.message || `API 请求失败，状态码: ${response.status}`);
+                        }
+                        return response;
+                    } catch (error) {
+                        console.error(`API call to ${endpoint} failed:`, error);
+                        // ElMessage.error(error.message); // Error message is already shown above for auth errors
+                        if (error.message !== 'AUTH_FAILURE') {
+                             ElMessage.error(`操作失败: ${error.message.substring(0,100)}`);
+                        }
+                        throw error; // Re-throw to be caught by specific callers if needed
+                    }
+                };
 
                 const handleSelect = (key) => {
                     activeTab.value = key;
@@ -1324,7 +1451,7 @@
                         formData.append('file', voiceFileInfo.value.raw);
                         formData.append('prefix', voiceForm.value.prefix || '');
                         formData.append('targetModel', voiceForm.value.targetModel || '');
-                        const response = await fetch(host + '/upload_voice', {
+                        const response = await simplifiedFetch('/upload_voice', {
                             method: 'POST',
                             body: formData
                         });
@@ -1381,13 +1508,9 @@
                     }
                 };
 
-                // 轮询检查状态的函数
                 const pollAvatarStatus = async (avatar_id) => {
                     try {
-                        const res = await fetch(host + `/avatar_status/${avatar_id}`);
-                        if (!res.ok) {
-                            throw new Error(`HTTP error! status: ${res.status}`);
-                        }
+                        const res = await simplifiedFetch(`/avatar_status/${avatar_id}`);
                         const data = await res.json();
                         if (data.status === 'success') {
                             // 更新列表中对应项的状态
@@ -1411,6 +1534,10 @@
                         }
                     } catch (error) {
                         console.error('Error polling avatar status:', error);
+                        if (error.message === 'AUTH_FAILURE') {
+                            // Polling stops due to auth failure, user is notified by simplifiedFetch
+                            ElMessage.warning('因授权问题，状态轮询已停止。')
+                        }
                     }
                 };
 
@@ -1428,7 +1555,7 @@
                         const formData = new FormData();
                         formData.append('file', avatarFileInfo.value.raw);
                         formData.append('name', avatarForm.value.name || '');
-                        const response = await fetch(host + '/upload_avatar', {
+                        const response = await simplifiedFetch('/upload_avatar', {
                             method: 'POST',
                             body: formData
                         });
@@ -1485,10 +1612,7 @@
                 const fetchVoices = async () => {
                     voiceLoading.value = true;
                     try {
-                        const res = await fetch(host + '/list_voices');
-                        if (!res.ok) {
-                            throw new Error(`HTTP error! status: ${res.status}`);
-                        }
+                        const res = await simplifiedFetch('/list_voices');
                         const data = await res.json();
                         console.log('Fetched voices data:', data);
                         if (!Array.isArray(data)) {
@@ -1513,10 +1637,7 @@
                 const fetchAvatars = async () => {
                     avatarLoading.value = true;
                     try {
-                        const res = await fetch(host + '/list_avatars');
-                        if (!res.ok) {
-                            throw new Error(`HTTP error! status: ${res.status}`);
-                        }
+                        const res = await simplifiedFetch('/list_avatars');
                         const data = await res.json();
                         if (!Array.isArray(data)) {
                             throw new Error('Invalid data format received');
@@ -1546,7 +1667,7 @@
                         const formData = new FormData();
                         formData.append('id', row.id);
                         formData.append('prefix', row.prefix);
-                        const res = await fetch(host + '/update_voice', {
+                        const res = await simplifiedFetch('/update_voice', {
                             method: 'POST',
                             body: formData
                         });
@@ -1566,7 +1687,7 @@
                 const deleteVoice = async (row) => {
                     row.deleting = true;
                     try {
-                        const res = await fetch(host + `/delete_voice/${row.voice_id}`, {
+                        const res = await simplifiedFetch(`/delete_voice/${row.voice_id}`, {
                             method: 'DELETE'
                         });
                         if (!res.ok) {
@@ -1598,7 +1719,7 @@
                         if (row.error_message !== undefined) formData.append('error_message', row.error_message);
                         if (row.file_url !== undefined) formData.append('file_url', row.file_url);
                         
-                        const res = await fetch(host + '/update_avatar', {
+                        const res = await simplifiedFetch('/update_avatar', {
                             method: 'POST',
                             body: formData
                         });
@@ -1623,7 +1744,7 @@
                 const deleteAvatar = async (row) => {
                     row.deleting = true;
                     try {
-                        const res = await fetch(host + `/delete_avatar/${row.avatar_id}`, {
+                        const res = await simplifiedFetch(`/delete_avatar/${row.avatar_id}`, {
                             method: 'DELETE'
                         });
                         if (!res.ok) {
@@ -1654,7 +1775,7 @@
                     if (serviceForm.value.running) {
                         // 停止服务
                         try {
-                            const response = await fetch(host + '/stop_service', {
+                            const response = await simplifiedFetch('/stop_service', {
                                 method: 'POST'
                             });
                             const data = await response.json();
@@ -1685,7 +1806,7 @@
                             extra_params: serviceForm.value.extraParams
                         };
 
-                        const response = await fetch(host + '/start_service', {
+                        const response = await simplifiedFetch('/start_service', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
@@ -1715,7 +1836,7 @@
                     if (!serviceForm.value.running) return;
 
                     try {
-                        const response = await fetch(host + '/service_logs');
+                        const response = await simplifiedFetch('/service_logs');
                         const data = await response.json();
                         if (data.status === 'success') {
                             // 格式化日志显示
@@ -1730,8 +1851,12 @@
                         }
                     } catch (error) {
                         console.error('Error polling service logs:', error);
+                        if (error.message === 'AUTH_FAILURE') {
+                           serviceForm.value.running = false; // Stop service UI on auth failure
+                           ElMessage.warning('因授权问题，服务日志轮询已停止。')
+                        }
                         if (serviceForm.value.running) {
-                            setTimeout(pollServiceLogs, 1000);
+                            setTimeout(pollServiceLogs, 3000); // Increased delay on error
                         }
                     }
                 };
@@ -1815,7 +1940,9 @@
                     Refresh: IconRefresh,
                     Link: IconLink,
                     VideoPlay: IconVideoPlay,
-                    Setting: IconSetting
+                    Setting: IconSetting,
+                    Unlock: IconUnlock,
+                    goToReauth
                 };
             }
         });
@@ -1834,6 +1961,7 @@
         app.component('Link', IconLink);
         app.component('VideoPlay', IconVideoPlay);
         app.component('Setting', IconSetting);
+        app.component('Unlock', IconUnlock);
 
         app.use(ElementPlus);
         app.mount('#app');
