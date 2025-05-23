@@ -272,6 +272,65 @@ async def run(push_url,sessionid):
     await pc.setLocalDescription(await pc.createOffer())
     answer = await post(push_url,pc.localDescription.sdp)
     await pc.setRemoteDescription(RTCSessionDescription(sdp=answer,type='answer'))
+
+# 新增 aiohttp 版本的 get_voice_id 接口
+async def get_voice_id_async(request):
+    if opt and hasattr(opt, 'voice_id_dashscope') and opt.voice_id_dashscope:
+        return web.json_response({"voice_id": opt.voice_id_dashscope})
+    else:
+        # 如果 voice_id 不可用，可以返回一个错误或者默认值
+        return web.json_response({"error": "Voice ID not available"}, status=404)
+
+
+async def main(host, port, character,model_name, tts_type, voice_id_dashscope, avatar_id):
+    app_aiohttp = web.Application()
+    app_aiohttp.add_routes([
+        web.post('/offer', offer),
+        web.post("/human", human),
+        web.post("/humanaudio", humanaudio),
+        web.post("/set_audiotype", set_audiotype),
+        web.post("/record", record),
+        web.post("/is_speaking", is_speaking),
+        web.get("/webrtcchat.html", chat_page), # 添加此路由以提供html页面
+        web.get("/static/{filename:.+}", static_page), # 添加此路由以提供静态文件
+        web.get("/get_voice_id", get_voice_id_async) # 添加新的 voice_id 接口
+    ])
+
+    # Configure CORS
+    cors = aiohttp_cors.setup(app_aiohttp, defaults={
+        "*": aiohttp_cors.ResourceOptions(
+            allow_credentials=True,
+            expose_headers="*",
+            allow_headers="*",
+        )
+    })
+    # Configure CORS on all routes.
+    for route in list(app_aiohttp.router.routes()):
+        cors.add(route)
+
+    runner = web.AppRunner(app_aiohttp)
+    await runner.setup()
+    site = web.TCPSite(runner, host, port)
+    await site.start()
+
+    print(f'TTS type: {tts_type}')
+    print(f'Voice ID (DashScope): {voice_id_dashscope}')
+    print(f'Avatar ID: {avatar_id}')
+
+    # 将命令行参数保存到全局 opt 对象
+    opt = argparse.Namespace(
+        host=host,
+        port=port,
+        character=character,
+        model=model_name,
+        tts_type=tts_type,
+        voice_id_dashscope=voice_id_dashscope,
+        avatar_id=avatar_id
+    )
+
+    while True:
+        await asyncio.sleep(3600)  # sleep for 1 hour
+
 ##########################################
 # os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
 # os.environ['MULTIPROCESSING_METHOD'] = 'forkserver'                                                    

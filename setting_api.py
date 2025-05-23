@@ -18,6 +18,7 @@ from collections import deque
 import json
 import signal
 import psutil
+from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
 app = FastAPI()
@@ -117,6 +118,9 @@ def reinit_db():
 
 # 如果需要重新初始化数据库，取消下面这行的注释
 # reinit_db()
+
+# 挂载 static 目录以便访问 web 下的文件
+app.mount("/web", StaticFiles(directory=os.path.join(BASE_DIR, "web")), name="web")
 
 @app.get("/")
 async def root():
@@ -558,6 +562,7 @@ def log_reader(process, log_queue):
                 'type': 'info'  # 可以根据输出内容判断类型
             }
             log_queue.append(log_entry)
+            logger.info(f"[Service Process]: {output.strip()}")
     
     # 添加进程结束的日志
     if process.poll() is not None:

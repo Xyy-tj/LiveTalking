@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>设置 - LiveTalking</title>
+    <title>LiveTalking 服务管理面板</title>
+    <link rel="icon" href="web/favicon.ico" type="image/x-icon">
     <!-- 引入 Vue 3 生产版本 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <!-- 引入 Element Plus -->
@@ -602,7 +603,7 @@
                             <template #title>管理</template>
                         </el-menu-item>
                         <el-menu-item index="service">
-                            <el-icon><video-play /></el-icon>
+                            <el-icon><setting /></el-icon>
                             <template #title>服务管理</template>
                         </el-menu-item>
                         <el-menu-item index="preview">
@@ -1189,6 +1190,8 @@
         const IconVideoCamera = ElementPlusIconsVue.VideoCamera;
         const IconRefresh = ElementPlusIconsVue.Refresh;
         const IconLink = ElementPlusIconsVue.Link;
+        const IconVideoPlay = ElementPlusIconsVue.VideoPlay;
+        const IconSetting = ElementPlusIconsVue.Setting;
         
         const app = createApp({
             setup() {
@@ -1231,10 +1234,8 @@
                         easing: 'ease-out-cubic',
                         once: true
                     });
-                    if (activeTab.value === 'manage') {
-                        fetchVoices();
-                        fetchAvatars();
-                    }
+                    fetchVoices();
+                    fetchAvatars();
                 });
 
                 const handleSelect = (key) => {
@@ -1718,12 +1719,7 @@
                         const data = await response.json();
                         if (data.status === 'success') {
                             // 格式化日志显示
-                            const formattedLogs = data.logs.map(log => `
-                                <div class="log-entry">
-                                    <span class="log-timestamp">${log.timestamp}</span>
-                                    <span class="log-message log-type-${log.type}">${log.message}</span>
-                                </div>
-                            `).join('');
+                            const formattedLogs = data.logs.map(log => `<div class="log-entry"><span class="log-timestamp">${log.timestamp}</span><span class="log-message log-type-${log.type}">${log.message}</span></div>`).join('');
                             
                             serviceForm.value.logs = formattedLogs;
                             
@@ -1817,7 +1813,9 @@
                     refreshPreview,
                     openInNewWindow,
                     Refresh: IconRefresh,
-                    Link: IconLink
+                    Link: IconLink,
+                    VideoPlay: IconVideoPlay,
+                    Setting: IconSetting
                 };
             }
         });
@@ -1834,6 +1832,8 @@
         app.component('VideoCamera', IconVideoCamera);
         app.component('Refresh', IconRefresh);
         app.component('Link', IconLink);
+        app.component('VideoPlay', IconVideoPlay);
+        app.component('Setting', IconSetting);
 
         app.use(ElementPlus);
         app.mount('#app');

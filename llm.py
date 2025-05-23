@@ -54,6 +54,8 @@ def llm_response(message,nerfreal:BaseReal):
                 logger.info(f"llm Time to first chunk: {end-start}s")
                 first = False
             msg = chunk.choices[0].delta.content
+            if msg is None:
+                msg = "" # 如果LLM返回的增量内容是None，则视为空字符串
             lastpos=0
             #msglist = re.split('[,.!;:，。！?]',msg)
             for i, char in enumerate(msg):

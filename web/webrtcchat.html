@@ -4,8 +4,9 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WebRTC webcam</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <style>
-    button {
+    /* button {
         padding: 8px 16px;
     }
 
@@ -19,46 +20,63 @@
 
     #media {
         max-width: 1280px;
-    }
+    } */
     </style>
 </head>
 <body>
 
-<div class="option">
-    <input id="use-stun" type="checkbox"/>
-    <label for="use-stun">Use STUN server</label>
-</div>
-<div class="option">
-    <label>当前音色ID: </label>
-    <span id="current-voice-id">loading...</span>
-    <button onclick="refreshVoiceId()">刷新</button>
-</div>
-<button id="start" onclick="start()">Start</button>
-<button id="stop" style="display: none" onclick="stop()">Stop</button>
-<button class="btn btn-primary" id="btn_start_record">Start Recording</button>
-<button class="btn btn-primary" id="btn_stop_record" disabled>Stop Recording</button>
-<!-- <button class="btn btn-primary" id="btn_download">Download Video</button> -->
-<input type="hidden" id="sessionid" value="0">
-<form class="form-inline" id="echo-form">
-    <div class="form-group">
-      <p>input text</p>
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8">
+            <div id="media" class="mb-3">
+                <h2>媒体</h2>
+                <video id="video" class="w-100 border bg-light" autoplay="true" playsinline="true"></video>
+                <audio id="audio" autoplay="true" class="mt-2"></audio>
+            </div>
 
-      <textarea cols="2" rows="3" style="width:600px;height:50px;" class="form-control" id="message">test</textarea>
+            <form class="form-inline mb-3" id="echo-form">
+                <div class="form-group mr-2 flex-grow-1">
+                    <label for="message" class="sr-only">输入文本</label>
+                    <textarea rows="3" class="form-control w-100" id="message" placeholder="请输入聊天内容">测试文本</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">发送</button>
+            </form>
+        </div>
+
+        <div class="col-md-4">
+            <div class="option mb-2">
+                <div class="form-check">
+                    <input id="use-stun" type="checkbox" class="form-check-input"/>
+                    <label for="use-stun" class="form-check-label">使用 STUN 服务器</label>
+                </div>
+            </div>
+            <div class="option mb-3">
+                <label>当前音色ID: </label>
+                <span id="current-voice-id" class="badge badge-info">loading...</span>
+                <button class="btn btn-sm btn-outline-secondary ml-2" onclick="refreshVoiceId()">刷新</button>
+            </div>
+
+            <div class="mb-3">
+                <button id="start" class="btn btn-success btn-block" onclick="start()">开始</button>
+                <button id="stop" class="btn btn-danger btn-block" style="display: none" onclick="stop()">停止</button>
+            </div>
+
+            <div class="mb-3">
+                <button class="btn btn-info btn-block" id="btn_start_record">开始录制</button>
+                <button class="btn btn-warning btn-block" id="btn_stop_record" disabled>停止录制</button>
+            </div>
+
+            <input type="hidden" id="sessionid" value="0">
+        </div>
     </div>
-    <button type="submit" class="btn btn-default">Send</button>
-  </form>
-
-<div id="media">
-    <h2>Media</h2>
-
-    <audio id="audio" autoplay="true"></audio>
-    <video id="video" style="width:600px;" autoplay="true" playsinline="true"></video>
 </div>
 
 <script src="client.js"></script>
 <!-- <script type="text/javascript" src="http://cdn.sockjs.org/sockjs-0.3.4.js"></script> -->
 <script type="text/javascript" src="https://cdn.jsdelivr.net/sockjs/0.3/sockjs.min.js"></script>
 <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 <script type="text/javascript" charset="utf-8">
     async function refreshVoiceId() {
