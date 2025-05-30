@@ -13,7 +13,7 @@ import asyncio
 import threading
 from typing import Optional, Dict, Callable, Awaitable
 import queue
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from collections import deque
 import json
 import signal
@@ -38,6 +38,11 @@ async def on_app_shutdown():
 
 # 注册关闭事件处理程序
 app.add_event_handler("shutdown", on_app_shutdown)
+
+@app.on_event("startup")
+async def on_app_startup():
+    logger.info("FastAPI application (setting_api.py) is starting up. Initializing database.")
+    init_db()
 
 # 允许跨域
 app.add_middleware(
@@ -194,10 +199,20 @@ service_process = None
 log_thread = None
 service_port = 6006
 
+# --- Pydantic 模型 ---
 class ServiceConfig(BaseModel):
     voice_id: str
     avatar_id: str
     extra_params: str = ""
+
+class RoleConfigPayload(BaseModel): # 修改模型
+    role_name: str = Field(..., alias='roleName')
+    preset_prompt: str = Field(..., alias='presetPrompt')
+    script_library_text: str = Field(..., alias='scriptLibraryText')
+
+    class Config:
+        populate_by_name = True # 允许通过别名填充模型字段，以及原始字段名
+        # orm_mode = True # 如果是从ORM对象创建模型实例，则需要，这里不需要
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -224,6 +239,16 @@ def init_db():
             created_at TEXT
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS role_configurations (
+            id INTEGER PRIMARY KEY,
+            role_name TEXT,
+            preset_prompt TEXT,
+            script_library_text TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -233,6 +258,7 @@ def reinit_db():
     c = conn.cursor()
     c.execute("DROP TABLE IF EXISTS voices")
     c.execute("DROP TABLE IF EXISTS avatars")
+    c.execute("DROP TABLE IF EXISTS role_configurations")
     conn.commit()
     conn.close()
     init_db()
@@ -1079,6 +1105,74 @@ def get_service_logs():
         "logs": list(service_logs)  # 转换 deque 为列表
     })
 
+# --- 角色配置 API ---
+@app.post("/save_role_config", dependencies=[Depends(verify_license_dependency)])
+async def save_role_config(payload: RoleConfigPayload):
+    conn = None  # Initialize conn to None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        now = datetime.now().isoformat()
+        
+        # 使用 INSERT OR REPLACE (UPSERT) 逻辑，因为我们总是操作 id=1 的记录
+        sql = """
+            INSERT OR REPLACE INTO role_configurations (id, role_name, preset_prompt, script_library_text, created_at, updated_at)
+            VALUES (
+                1, ?, ?, ?,
+                COALESCE((SELECT created_at FROM role_configurations WHERE id = 1), ?),
+                ?
+            )
+        """
+        params = (payload.role_name, payload.preset_prompt, payload.script_library_text, now, now)
+        c.execute(sql, params)
+        
+        conn.commit()
+        logger.info(f"角色配置已保存/更新: {payload.role_name}")
+        return {"status": "success", "message": "角色配置已成功保存！"}
+    except Exception as e:
+        logger.error(f"保存角色配置失败: {str(e)}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": f"保存角色配置失败: {str(e)}"})
+    finally:
+        if conn:
+            conn.close()
+
+@app.get("/get_role_config", dependencies=[Depends(verify_license_dependency)])
+async def get_role_config_api():
+    conn = None  # Initialize conn to None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT role_name, preset_prompt, script_library_text, updated_at FROM role_configurations WHERE id = 1")
+        row = c.fetchone()
+        
+        if row:
+            return {
+                "status": "success",
+                "data": {
+                    "role_name": row[0],
+                    "preset_prompt": row[1],
+                    "script_library_text": row[2],
+                    "updated_at": row[3]
+                }
+            }
+        else:
+            return {
+                "status": "success",
+                "data": {
+                    "role_name": "",
+                    "preset_prompt": "",
+                    "script_library_text": "",
+                    "updated_at": None
+                }
+            }
+    except Exception as e:
+        logger.error(f"获取角色配置失败: {str(e)}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": f"获取角色配置失败: {str(e)}"})
+    finally:
+        if conn:
+            conn.close()
+
 if __name__ == "__main__":
     import uvicorn
+    # init_db() # 不再需要在这里调用，由启动事件处理
     uvicorn.run("setting_api:app", host="0.0.0.0", port=8001, reload=True) 

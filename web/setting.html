@@ -1427,10 +1427,11 @@
                         easing: 'ease-out-cubic',
                         once: true
                     });
-                    // checkAuthorizationOnLoad(); // REMOVED - Backend handles this
-                    // Fetch initial data directly. If auth fails, API calls will trigger error handling.
                     fetchVoices();
                     fetchAvatars();
+                    if (activeTab.value === 'roleConfig') {
+                        fetchRoleConfig(true);
+                    }
                 });
 
                 const goToReauth = () => {
@@ -1445,8 +1446,6 @@
                         if (!response.ok) {
                             if (response.status === 401 || response.status === 403) {
                                 ElMessage.error('授权已失效或访问被拒绝，请重新授权。');
-                                // Consider a more prominent way to guide user, e.g., a modal with a button to goToReauth()
-                                // For now, a message and they can use the re-auth button.
                                 throw new Error('AUTH_FAILURE'); 
                             }
                             const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
@@ -1455,11 +1454,10 @@
                         return response;
                     } catch (error) {
                         console.error(`API call to ${endpoint} failed:`, error);
-                        // ElMessage.error(error.message); // Error message is already shown above for auth errors
                         if (error.message !== 'AUTH_FAILURE') {
                              ElMessage.error(`操作失败: ${error.message.substring(0,100)}`);
                         }
-                        throw error; // Re-throw to be caught by specific callers if needed
+                        throw error;
                     }
                 };
 
@@ -1633,7 +1631,6 @@
                     } catch (error) {
                         console.error('Error polling avatar status:', error);
                         if (error.message === 'AUTH_FAILURE') {
-                            // Polling stops due to auth failure, user is notified by simplifiedFetch
                             ElMessage.warning('因授权问题，状态轮询已停止。')
                         }
                     }
@@ -1694,6 +1691,8 @@
                         fetchVoices();
                     } else if (tab.props.name === 'avatars') {
                         fetchAvatars();
+                    } else if (tab.props.name === 'roleConfig') {
+                        fetchRoleConfig(true);
                     }
                 };
 
@@ -1965,6 +1964,29 @@
                     }
                 };
 
+                // 获取角色配置
+                const fetchRoleConfig = async (showUpdatedMessage = false) => {
+                    roleConfigLoading.value = true;
+                    try {
+                        const response = await simplifiedFetch('/get_role_config');
+                        const data = await response.json();
+                        if (data.status === 'success' && data.data) {
+                            roleConfigForm.value.roleName = data.data.role_name || '';
+                            roleConfigForm.value.presetPrompt = data.data.preset_prompt || '';
+                            roleConfigForm.value.scriptLibraryText = data.data.script_library_text || '';
+                            if (showUpdatedMessage && data.data.updated_at) {
+                                ElMessage.info(`角色配置上次更新于: ${formatDate(data.data.updated_at)}`);
+                            }
+                        } else {
+                            ElMessage.error(data.message || '获取角色配置失败');
+                        }
+                    } catch (error) {
+                        console.error('获取角色配置失败:', error);
+                    } finally {
+                        roleConfigLoading.value = false;
+                    }
+                };
+
                 // 切换到管理tab时自动刷新
                 watch(() => activeTab.value, (val) => {
                     if (val === 'manage') {
@@ -1973,6 +1995,8 @@
                         } else {
                             fetchAvatars();
                         }
+                    } else if (val === 'roleConfig') {
+                        fetchRoleConfig(true);
                     }
                 });
 
@@ -2002,23 +2026,12 @@
                     console.log('提交角色配置:', roleConfigForm.value);
 
                     try {
-                        // 模拟 API 调用
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-
-                        // 假设后端接口为 /save_role_config
-                        // const response = await simplifiedFetch('/save_role_config', {
-                        //     method: 'POST',
-                        //     headers: { 'Content-Type': 'application/json' },
-                        //     body: JSON.stringify(roleConfigForm.value)
-                        // });
-                        // const data = await response.json();
-
-                        // 模拟成功响应
-                        const data = {
-                            status: 'success',
-                            message: '角色配置已成功保存！',
-                            // data: roleConfigForm.value // 可选：后端返回保存后的数据
-                        };
+                        const response = await simplifiedFetch('/save_role_config', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(roleConfigForm.value)
+                        });
+                        const data = await response.json();
 
                         if (data.status === 'success') {
                             roleConfigResult.value = {
@@ -2027,6 +2040,7 @@
                                 message: data.message
                             };
                             ElMessage.success(data.message);
+                            await fetchRoleConfig(true);
                         } else {
                             roleConfigResult.value = {
                                 title: '保存失败',
@@ -2040,13 +2054,14 @@
                         let errorMessage = error.message;
                         if (error.message === 'AUTH_FAILURE') {
                             errorMessage = '授权失败，无法保存配置。请重新授权。';
+                        } else {
+                            // 其他错误，simplifiedFetch 可能已经提示，这里可以补充或记录
                         }
                         roleConfigResult.value = {
                             title: '保存失败',
                             type: 'error',
                             message: `错误: ${errorMessage}`
                         };
-                        // ElMessage.error(`保存角色配置时出错: ${error.message}`); // simplifiedFetch 已经处理了部分错误提示
                     } finally {
                         roleConfigLoading.value = false;
                     }
@@ -2097,7 +2112,6 @@
                     previewFrame,
                     refreshPreview,
                     openInNewWindow,
-                    // 角色配置相关
                     roleConfigForm,
                     roleConfigLoading,
                     roleConfigResult,
