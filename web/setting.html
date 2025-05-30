@@ -675,28 +675,29 @@
                         @select="handleSelect">
                         <el-menu-item index="voiceUpload">
                             <el-icon><microphone /></el-icon>
-                            <template #title>自定义语音上传</template>
+                            <template #title>自定义音色</template>
                         </el-menu-item>
                         <el-menu-item index="avatarUpload">
                             <el-icon><avatar /></el-icon>
-                            <template #title>数字人形象上传</template>
+                            <template #title>自定义形象</template>
                         </el-menu-item>
                         <el-menu-item index="manage">
                             <el-icon><document /></el-icon>
-                            <template #title>管理</template>
-                        </el-menu-item>
-                        <el-menu-item index="service">
-                            <el-icon><setting /></el-icon>
-                            <template #title>服务管理</template>
-                        </el-menu-item>
-                        <el-menu-item index="preview">
-                            <el-icon><video-play /></el-icon>
-                            <template #title>实时预览</template>
+                            <template #title>数字人数据管理</template>
                         </el-menu-item>
                         <el-menu-item index="roleConfig">
                             <el-icon><tickets /></el-icon>
-                            <template #title>角色配置</template>
+                            <template #title>角色预设</template>
                         </el-menu-item>
+                        <el-menu-item index="service">
+                            <el-icon><setting /></el-icon>
+                            <template #title>数字人直播服务</template>
+                        </el-menu-item>
+                        <el-menu-item index="preview">
+                            <el-icon><video-play /></el-icon>
+                            <template #title>实时预览控制台</template>
+                        </el-menu-item>
+                        
                     </el-menu>
                     <!-- Re-authorize Button -->
                     <div class="reauth-button-container" v-if="!isCollapse">

@@ -64,7 +64,7 @@ def llm_response(message,nerfreal:BaseReal):
         preset_prompt_text = role_config.get("preset_prompt", "")
         script_library = role_config.get("script_library_text", "")
 
-        system_prompt_content = f"你是名叫 \"{role_name}\" 的AI。\n{preset_prompt_text}"
+        system_prompt_content = f"你是名叫 \"{role_name}\" 的直播助手。\n{preset_prompt_text}"
         if script_library:
             system_prompt_content += f"\n\n你可以参考以下话术内容：\n---\n{script_library}\n---"
         logger.info(f"使用数据库中的角色配置: {role_name}")

@@ -26,3 +26,5 @@ dist
 .env
 /uploads
 .env
+first_chunk_original.wav
+first_chunk_truncated.wav

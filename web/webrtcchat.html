@@ -75,10 +75,16 @@
             <div class="card mb-3" id="media_container">
                 <div class="card-header">
                     媒体流
+                    <div id="rtc-stability-warning" class="alert alert-info alert-dismissible fade show mt-2" role="alert" style="display: none; font-size: 0.85rem; padding: 0.5rem 1rem;">
+                        <strong>提示:</strong> 服务刚启动时（约1分钟内），RTC服务会自适应传输码率，可能存在短暂画面模糊，随后将逐渐稳定并显著好转。
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close" style="padding: 0.5rem 1rem;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body text-center">
                     <div id="media">
-                        <video id="video" class="w-100 border bg-light" autoplay="true" playsinline="true"></video>
+                        <video id="video" class="w-100 border bg-light" autoplay="true" playsinline="true" controls></video>
                         <audio id="audio" autoplay="true" class="mt-2" style="display: none;"></audio> <!-- 隐藏audio元素，如果不需要显示的话 -->
                     </div>
                 </div>
@@ -132,6 +138,10 @@
                         <span id="current-voice-id" class="badge badge-info">loading...</span>
                         <button class="btn btn-sm btn-outline-secondary float-right" onclick="refreshVoiceId()">刷新</button>
                     </div>
+                    <div class="option mt-2">
+                        <label>视频分辨率: </label>
+                        <span id="video-resolution" class="badge badge-secondary">- x -</span>
+                    </div>
                 </div>
             </div>
 
@@ -139,7 +149,7 @@
             <div class="card mb-3">
                 <div class="card-header">主控制</div>
                 <div class="card-body">
-                    <button id="start" class="btn btn-success btn-block" onclick="start()">开始连接</button>
+                    <button id="start" class="btn btn-success btn-block" onclick="showRtcWarningAndStart()">开始连接</button>
                     <button id="stop" class="btn btn-danger btn-block" style="display: none" onclick="stop()">断开连接</button>
                 </div>
             </div>
@@ -181,6 +191,50 @@
 
     // 页面加载时获取音色ID
     document.addEventListener('DOMContentLoaded', refreshVoiceId);
+
+    let rtcWarningTimeout = null;
+
+    // 获取 video 元素
+    const videoElement = document.getElementById('video');
+
+    // 更新视频分辨率显示的函数
+    function updateVideoResolution() {
+        const resolutionSpan = document.getElementById('video-resolution');
+        if (videoElement.videoWidth && videoElement.videoHeight) {
+            resolutionSpan.textContent = `${videoElement.videoWidth} x ${videoElement.videoHeight}`;
+        } else {
+            resolutionSpan.textContent = "- x -";
+        }
+    }
+
+    // 当视频元数据加载完成或视频开始播放时，更新分辨率
+    videoElement.onloadedmetadata = updateVideoResolution;
+    videoElement.onplaying = updateVideoResolution;
+    // 有些浏览器可能在尺寸改变时触发resize，但更可靠的是轮询或监听特定事件
+    // 为确保动态变化也能捕获，可以考虑在onplaying后设置一个定时器轮询，但需注意性能
+    // videoElement.onresize = updateVideoResolution; // onresize 对 video 元素不一定总是触发
+
+    function showRtcWarningAndStart() {
+        const warningDiv = document.getElementById('rtc-stability-warning');
+        warningDiv.style.display = 'block';
+
+        // 清除可能存在的旧的timeout
+        if (rtcWarningTimeout) {
+            clearTimeout(rtcWarningTimeout);
+        }
+
+        // 20秒后自动隐藏提示，您可以调整这个时间
+        rtcWarningTimeout = setTimeout(() => {
+            $(warningDiv).alert('close'); // 使用Bootstrap的alert关闭方法，会有淡出效果
+        }, 20000); 
+
+        // 调用原来的 start() 函数 (假设它在 client.js 或全局作用域中)
+        if (typeof start === 'function') {
+            start();
+        } else {
+            console.error('start() function is not defined. Make sure client.js is loaded and start() is global or properly scoped.');
+        }
+    }
 
 	$(document).ready(function() {
 	  // var host = window.location.hostname
