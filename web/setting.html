@@ -693,6 +693,10 @@
                             <el-icon><video-play /></el-icon>
                             <template #title>实时预览</template>
                         </el-menu-item>
+                        <el-menu-item index="roleConfig">
+                            <el-icon><tickets /></el-icon>
+                            <template #title>角色配置</template>
+                        </el-menu-item>
                     </el-menu>
                     <!-- Re-authorize Button -->
                     <div class="reauth-button-container" v-if="!isCollapse">
@@ -1262,6 +1266,86 @@
                             ></iframe>
                         </div>
                     </div>
+
+                    <div v-show="activeTab === 'roleConfig'" class="upload-container" data-aos="fade-up">
+                        <h2 class="section-title">
+                            <el-icon><tickets /></el-icon>
+                            角色配置
+                        </h2>
+
+                        <div class="feature-tags">
+                            <span class="feature-tag">
+                                <el-icon><user-filled /></el-icon>
+                                个性化角色定义
+                            </span>
+                            <span class="feature-tag">
+                                <el-icon><chat-dot-round /></el-icon>
+                                智能对话管理
+                            </span>
+                            <span class="feature-tag">
+                                <el-icon><notebook /></el-icon>
+                                结构化话术库
+                            </span>
+                        </div>
+
+                        <el-form :model="roleConfigForm" label-position="top" style="margin-top: 24px;">
+                            <el-form-item label="角色名称">
+                                <el-input
+                                    v-model="roleConfigForm.roleName"
+                                    placeholder="为您的数字人角色起一个名字"
+                                    clearable
+                                >
+                                    <template #prefix>
+                                        <el-icon><user /></el-icon>
+                                    </template>
+                                </el-input>
+                            </el-form-item>
+
+                            <el-form-item label="预设提示词 (System Prompt)">
+                                <el-input
+                                    v-model="roleConfigForm.presetPrompt"
+                                    type="textarea"
+                                    :rows="5"
+                                    placeholder="定义角色的行为、背景和对话风格。例如：你是一个乐于助人的AI助手，专注于解答技术问题。"
+                                />
+                            </el-form-item>
+
+                            <el-form-item label="话术库 (一行一条，支持变量)">
+                                <el-input
+                                    v-model="roleConfigForm.scriptLibraryText"
+                                    type="textarea"
+                                    :rows="10"
+                                    placeholder="请输入话术，每行一条。您可以使用 {变量名} 的格式插入动态内容。"
+                                />
+                                <div class="el-upload__tip" style="margin-top: 8px;">
+                                    例如：欢迎来到我们的直播间，今天我们有特别优惠哦！你好，{userName}！
+                                </div>
+                            </el-form-item>
+
+                            <el-form-item>
+                                <el-button
+                                    type="primary"
+                                    :loading="roleConfigLoading"
+                                    @click="submitRoleConfigForm"
+                                >
+                                    {{ roleConfigLoading ? '保存中...' : '保存配置' }}
+                                </el-button>
+                            </el-form-item>
+                        </el-form>
+
+                        <el-alert
+                            v-if="roleConfigResult"
+                            :title="roleConfigResult.title"
+                            :type="roleConfigResult.type"
+                            show-icon
+                            closable
+                        >
+                            <template #description>
+                                <div v-html="roleConfigResult.message"></div>
+                            </template>
+                        </el-alert>
+                    </div>
+
                 </el-main>
             </el-container>
         </div>
@@ -1287,6 +1371,10 @@
         const IconVideoPlay = ElementPlusIconsVue.VideoPlay;
         const IconSetting = ElementPlusIconsVue.Setting;
         const IconUnlock = ElementPlusIconsVue.Unlock;
+        const IconTickets = ElementPlusIconsVue.Tickets;
+        const IconUserFilled = ElementPlusIconsVue.UserFilled;
+        const IconChatDotRound = ElementPlusIconsVue.ChatDotRound;
+        const IconNotebook = ElementPlusIconsVue.Notebook;
         
         const app = createApp({
             setup() {
@@ -1318,10 +1406,20 @@
                     extraParams: '',
                     running: false,
                     starting: false,
-                    logs: ''
+                    logs: '',
+                    logPollErrorCount: 0
                 });
                 const previewUrl = ref('http://localhost:6006/webrtcchat.html');
                 const previewFrame = ref(null);
+
+                // 角色配置相关
+                const roleConfigForm = ref({
+                    roleName: '',
+                    presetPrompt: '',
+                    scriptLibraryText: ''
+                });
+                const roleConfigLoading = ref(false);
+                const roleConfigResult = ref(null);
 
                 onMounted(() => {
                     AOS.init({
@@ -1843,6 +1941,7 @@
                             const formattedLogs = data.logs.map(log => `<div class="log-entry"><span class="log-timestamp">${log.timestamp}</span><span class="log-message log-type-${log.type}">${log.message}</span></div>`).join('');
                             
                             serviceForm.value.logs = formattedLogs;
+                            serviceForm.value.logPollErrorCount = 0;
                             
                             // 如果服务仍在运行，继续轮询
                             if (serviceForm.value.running) {
@@ -1851,12 +1950,17 @@
                         }
                     } catch (error) {
                         console.error('Error polling service logs:', error);
+                        serviceForm.value.logPollErrorCount++;
+
                         if (error.message === 'AUTH_FAILURE') {
-                           serviceForm.value.running = false; // Stop service UI on auth failure
+                           serviceForm.value.running = false;
                            ElMessage.warning('因授权问题，服务日志轮询已停止。')
                         }
-                        if (serviceForm.value.running) {
-                            setTimeout(pollServiceLogs, 3000); // Increased delay on error
+                        
+                        if (serviceForm.value.running && serviceForm.value.logPollErrorCount < 3) {
+                            setTimeout(pollServiceLogs, 3000);
+                        } else if (serviceForm.value.running && serviceForm.value.logPollErrorCount >= 3) {
+                            ElMessage.error('服务日志轮询连续失败多次，已暂停。请检查服务状态或网络连接。');
                         }
                     }
                 };
@@ -1890,6 +1994,62 @@
 
                 const openInNewWindow = () => {
                     window.open(previewUrl.value, '_blank');
+                };
+
+                const submitRoleConfigForm = async () => {
+                    roleConfigLoading.value = true;
+                    roleConfigResult.value = null;
+                    console.log('提交角色配置:', roleConfigForm.value);
+
+                    try {
+                        // 模拟 API 调用
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+
+                        // 假设后端接口为 /save_role_config
+                        // const response = await simplifiedFetch('/save_role_config', {
+                        //     method: 'POST',
+                        //     headers: { 'Content-Type': 'application/json' },
+                        //     body: JSON.stringify(roleConfigForm.value)
+                        // });
+                        // const data = await response.json();
+
+                        // 模拟成功响应
+                        const data = {
+                            status: 'success',
+                            message: '角色配置已成功保存！',
+                            // data: roleConfigForm.value // 可选：后端返回保存后的数据
+                        };
+
+                        if (data.status === 'success') {
+                            roleConfigResult.value = {
+                                title: '保存成功',
+                                type: 'success',
+                                message: data.message
+                            };
+                            ElMessage.success(data.message);
+                        } else {
+                            roleConfigResult.value = {
+                                title: '保存失败',
+                                type: 'error',
+                                message: data.message || '保存角色配置时发生未知错误。'
+                            };
+                            ElMessage.error(data.message || '保存角色配置失败');
+                        }
+                    } catch (error) {
+                        console.error('保存角色配置失败:', error);
+                        let errorMessage = error.message;
+                        if (error.message === 'AUTH_FAILURE') {
+                            errorMessage = '授权失败，无法保存配置。请重新授权。';
+                        }
+                        roleConfigResult.value = {
+                            title: '保存失败',
+                            type: 'error',
+                            message: `错误: ${errorMessage}`
+                        };
+                        // ElMessage.error(`保存角色配置时出错: ${error.message}`); // simplifiedFetch 已经处理了部分错误提示
+                    } finally {
+                        roleConfigLoading.value = false;
+                    }
                 };
 
                 return {
@@ -1937,6 +2097,11 @@
                     previewFrame,
                     refreshPreview,
                     openInNewWindow,
+                    // 角色配置相关
+                    roleConfigForm,
+                    roleConfigLoading,
+                    roleConfigResult,
+                    submitRoleConfigForm,
                     Refresh: IconRefresh,
                     Link: IconLink,
                     VideoPlay: IconVideoPlay,
@@ -1962,6 +2127,10 @@
         app.component('VideoPlay', IconVideoPlay);
         app.component('Setting', IconSetting);
         app.component('Unlock', IconUnlock);
+        app.component('Tickets', IconTickets);
+        app.component('UserFilled', IconUserFilled);
+        app.component('ChatDotRound', IconChatDotRound);
+        app.component('Notebook', IconNotebook);
 
         app.use(ElementPlus);
         app.mount('#app');

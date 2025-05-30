@@ -3,76 +3,161 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebRTC webcam</title>
+    <title>WebRTC 聊天演示</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <style>
-    /* button {
-        padding: 8px 16px;
+    body {
+        background-color: #f8f9fa;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh; /* 确保body至少和视口一样高 */
     }
-
-    video {
+    .container-fluid {
+        flex: 1; /* 让容器填充剩余空间 */
+        display: flex;
+        flex-direction: column;
+        padding-top: 1rem; /* 顶部留出一些空间 */
+        padding-bottom: 1rem; /* 底部留出一些空间 */
+    }
+    .card-header {
+        background-color: #e9ecef;
+        font-weight: bold;
+    }
+    .chat-textarea {
+        resize: none; /* 禁止用户调整文本框大小 */
+    }
+    #media_container {
+        flex: 1; /* 媒体容器填充可用垂直空间 */
+        display: flex;
+        flex-direction: column;
+        min-height: 300px; /* 媒体区域的最小高度 */
+    }
+    #media_container .card-body {
+        flex: 1;
+        display: flex;
+        align-items: center; /* 垂直居中视频 */
+        justify-content: center; /* 水平居中视频 */
+        overflow: hidden; /* 防止视频溢出 */
+    }
+    #media video {
         width: 100%;
+        height: auto; /* 高度自适应，保持宽高比 */
+        max-width: 100%; /* 确保视频不超过容器宽度 */
+        max-height: 80vh; /* 视频最大高度为视口高度的80% */
+        border-radius: .25rem; /* 轻微圆角 */
+        object-fit: contain; /* 保持宽高比，完整显示视频内容 */
     }
-
-    .option {
-        margin-bottom: 8px;
+    .control-panel .btn {
+        margin-bottom: 0.5rem; /* 按钮间距 */
     }
-
-    #media {
-        max-width: 1280px;
-    } */
+    .control-panel .option {
+        padding: 0.5rem;
+        border: 1px solid #ddd;
+        border-radius: .25rem;
+        background-color: #fff;
+    }
+    .main-row {
+        flex: 1; /* 让包含主要内容和控制面板的行填充空间 */
+    }
+    .main-content-col {
+        display: flex;
+        flex-direction: column;
+    }
     </style>
 </head>
 <body>
 
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-md-8">
-            <div id="media" class="mb-3">
-                <h2>媒体</h2>
-                <video id="video" class="w-100 border bg-light" autoplay="true" playsinline="true"></video>
-                <audio id="audio" autoplay="true" class="mt-2"></audio>
+<div class="container-fluid mt-4 mb-4">
+    <h1 class="text-center mb-4">WebRTC 实时互动</h1>
+    <div class="row main-row">
+        <div class="col-lg-8 main-content-col">
+            <!-- 媒体播放区 -->
+            <div class="card mb-3" id="media_container">
+                <div class="card-header">
+                    媒体流
+                </div>
+                <div class="card-body text-center">
+                    <div id="media">
+                        <video id="video" class="w-100 border bg-light" autoplay="true" playsinline="true"></video>
+                        <audio id="audio" autoplay="true" class="mt-2" style="display: none;"></audio> <!-- 隐藏audio元素，如果不需要显示的话 -->
+                    </div>
+                </div>
             </div>
 
-            <form class="form-inline mb-3" id="echo-form">
-                <div class="form-group mr-2 flex-grow-1">
-                    <label for="message" class="sr-only">输入文本</label>
-                    <textarea rows="3" class="form-control w-100" id="message" placeholder="请输入聊天内容">测试文本</textarea>
+            <!-- 对话功能与话术控制合并区 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    互动与控制
                 </div>
-                <button type="submit" class="btn btn-primary">发送</button>
-            </form>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>对话交流 (Chat)</h5>
+                            <form id="echo-form">
+                                <div class="form-group">
+                                    <label for="message">输入文本:</label>
+                                    <textarea rows="3" class="form-control chat-textarea" id="message" placeholder="请输入聊天内容">测试文本</textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">发送</button>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>数字人话术控制 (Echo)</h5>
+                            <form id="digital-human-form">
+                                <div class="form-group">
+                                    <label for="digital-message">输入话术:</label>
+                                    <textarea rows="3" class="form-control chat-textarea" id="digital-message" placeholder="请输入数字人要直接输出的话术"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-success btn-block">直接输出</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="col-md-4">
-            <div class="option mb-2">
-                <div class="form-check">
-                    <input id="use-stun" type="checkbox" class="form-check-input"/>
-                    <label for="use-stun" class="form-check-label">使用 STUN 服务器</label>
+        <div class="col-lg-4 control-panel">
+            <!-- STUN 服务器选项 -->
+            <div class="card mb-3">
+                <div class="card-header">设置</div>
+                <div class="card-body">
+                    <div class="option mb-2">
+                        <div class="form-check">
+                            <input id="use-stun" type="checkbox" class="form-check-input"/>
+                            <label for="use-stun" class="form-check-label">使用 STUN 服务器</label>
+                        </div>
+                    </div>
+                    <div class="option">
+                        <label>当前音色ID: </label>
+                        <span id="current-voice-id" class="badge badge-info">loading...</span>
+                        <button class="btn btn-sm btn-outline-secondary float-right" onclick="refreshVoiceId()">刷新</button>
+                    </div>
                 </div>
             </div>
-            <div class="option mb-3">
-                <label>当前音色ID: </label>
-                <span id="current-voice-id" class="badge badge-info">loading...</span>
-                <button class="btn btn-sm btn-outline-secondary ml-2" onclick="refreshVoiceId()">刷新</button>
+
+            <!-- 主要控制按钮 -->
+            <div class="card mb-3">
+                <div class="card-header">主控制</div>
+                <div class="card-body">
+                    <button id="start" class="btn btn-success btn-block" onclick="start()">开始连接</button>
+                    <button id="stop" class="btn btn-danger btn-block" style="display: none" onclick="stop()">断开连接</button>
+                </div>
             </div>
 
-            <div class="mb-3">
-                <button id="start" class="btn btn-success btn-block" onclick="start()">开始</button>
-                <button id="stop" class="btn btn-danger btn-block" style="display: none" onclick="stop()">停止</button>
+            <!-- 录制控制按钮 -->
+            <div class="card">
+                <div class="card-header">录制功能</div>
+                <div class="card-body">
+                    <button class="btn btn-info btn-block" id="btn_start_record">开始录制</button>
+                    <button class="btn btn-warning btn-block" id="btn_stop_record" disabled>停止录制</button>
+                </div>
             </div>
-
-            <div class="mb-3">
-                <button class="btn btn-info btn-block" id="btn_start_record">开始录制</button>
-                <button class="btn btn-warning btn-block" id="btn_stop_record" disabled>停止录制</button>
-            </div>
-
             <input type="hidden" id="sessionid" value="0">
         </div>
     </div>
 </div>
 
 <script src="client.js"></script>
-<!-- <script type="text/javascript" src="http://cdn.sockjs.org/sockjs-0.3.4.js"></script> -->
 <script type="text/javascript" src="https://cdn.jsdelivr.net/sockjs/0.3/sockjs.min.js"></script>
 <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
@@ -133,9 +218,27 @@
             },
             method: 'POST'
       });
-      //ws.send(message);
       $('#message').val('');
 	  });
+
+    $('#digital-human-form').on('submit', function(e) {
+      e.preventDefault();
+      var message = $('#digital-message').val();
+      console.log('Sending digital message: ' + message);
+      fetch('/human', {
+            body: JSON.stringify({
+                text: message,
+                type: 'echo',
+                interrupt: true,
+                sessionid:parseInt(document.getElementById('sessionid').value),
+            }),
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            method: 'POST'
+      });
+      $('#digital-message').val('');
+    });
 
     $('#btn_start_record').click(function() {
         // 开始录制

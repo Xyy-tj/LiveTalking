@@ -31,6 +31,14 @@ from urllib.parse import urlencode # 新增导入
 load_dotenv()
 app = FastAPI()
 
+# 优雅关闭：定义应用关闭时执行的函数
+async def on_app_shutdown():
+    logger.info("FastAPI application (setting_api.py) is shutting down. Cleaning up services.")
+    cleanup_service() # 这个函数包含了停止 app.py 子进程的逻辑
+
+# 注册关闭事件处理程序
+app.add_event_handler("shutdown", on_app_shutdown)
+
 # 允许跨域
 app.add_middleware(
     CORSMiddleware,
@@ -287,6 +295,7 @@ AUTH_PAGE_HTML_TEMPLATE = """
 
 async def validate_license_key_logic(license_key: Optional[str]):
     system_license_key_env = os.getenv("SYSTEM_LICENSE_KEY")
+    logger.info(f"SYSTEM_LICENSE_KEY: {system_license_key_env}")
     if not system_license_key_env:
         logger.error("【授权验证】SYSTEM_LICENSE_KEY 环境变量未设置。")
         raise HTTPException(status_code=503, detail="授权服务未配置或不可用 (Error: SYS_KEY_MISSING)")

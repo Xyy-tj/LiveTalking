@@ -156,10 +156,8 @@ async def human(request):
         nerfreals[sessionid].flush_talk()
 
     if params['type']=='echo':
-        # 使用异步批处理
-        await nerfreals[sessionid].put_data(params['text'])
-        result = await nerfreals[sessionid].get_result()
-        nerfreals[sessionid].put_msg_txt(result)
+        # 直接让数字人播报文本
+        await nerfreals[sessionid].put_msg_txt(params['text'])
     elif params['type']=='chat':
         res = await asyncio.get_event_loop().run_in_executor(None, llm_response, params['text'],nerfreals[sessionid])
         await nerfreals[sessionid].put_data(res)
