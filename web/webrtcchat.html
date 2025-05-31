@@ -560,6 +560,17 @@
         });
 
         observer.observe(sessionIdInput, { attributes: true });
+
+        // 默认自动开始连接
+        if (typeof showRtcWarningAndStart === 'function') {
+            console.log('[webrtcchat.html] DOMContentLoaded, attempting to auto-start WebRTC connection...');
+            showRtcWarningAndStart();
+        } else if (typeof start === 'function') { // Fallback
+            console.log('[webrtcchat.html] DOMContentLoaded, attempting to auto-start WebRTC connection (fallback start())...');
+            start();
+        } else {
+            console.error('[webrtcchat.html] Auto-start failed: start function not found.');
+        }
     });
 </script>
 </html>
