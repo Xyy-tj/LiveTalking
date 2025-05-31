@@ -30,22 +30,37 @@
         flex: 1; /* 媒体容器填充可用垂直空间 */
         display: flex;
         flex-direction: column;
-        min-height: 300px; /* 媒体区域的最小高度 */
+        min-height: 0; /* 移除最小高度限制，允许完全基于父级或iframe */
+        height: 100%; /* 让媒体容器尝试填充父级（比如iframe）的高度 */
+        border: none; /* 如果有边框，移除 */
+        padding: 0; /* 移除内边距 */
+    }
+    #media_container .card-header {
+        display: none; /* 隐藏媒体流的头部，使其不占用空间 */
     }
     #media_container .card-body {
         flex: 1;
         display: flex;
-        align-items: center; /* 垂直居中视频 */
-        justify-content: center; /* 水平居中视频 */
+        /* align-items: center; */ /* 移除以允许视频从左上角开始填充 */
+        /* justify-content: center; */ /* 移除以允许视频从左上角开始填充 */
         overflow: hidden; /* 防止视频溢出 */
+        padding: 0; /* 移除内边距 */
+        height: 100%;
+        width: 100%;
+    }
+    #media { /* 新增或修改 #media 容器的样式 */
+        width: 100%;
+        height: 100%;
+        display: flex; /* 使内部 video 也能更好地控制 */
     }
     #media video {
         width: 100%;
-        height: auto; /* 高度自适应，保持宽高比 */
-        max-width: 100%; /* 确保视频不超过容器宽度 */
-        max-height: 80vh; /* 视频最大高度为视口高度的80% */
-        border-radius: .25rem; /* 轻微圆角 */
-        object-fit: contain; /* 保持宽高比，完整显示视频内容 */
+        height: 100%; /* 高度占满容器 */
+        /* max-width: 100%; */ /* 已被 width: 100% 覆盖 */
+        /* max-height: 80vh; */ /* 移除最大高度限制 */
+        border-radius: 0; /* 移除圆角，使其看起来更像全屏 */
+        object-fit: cover; /* 保持宽高比，裁剪以填充空间 */
+        /* object-fit: contain; */ /* (原)保持宽高比，完整显示视频内容 */
     }
     .control-panel .btn {
         margin-bottom: 0.5rem; /* 按钮间距 */
@@ -375,8 +390,88 @@
     //     });
     // });
 
+      // Listen for messages from parent window (setting.html)
+      window.addEventListener('message', function(event) {
+          // IMPORTANT: Always verify the origin of the message!
+          if (event.origin !== 'http://localhost:8001') { // Expected origin of setting.html
+              // console.log('[webrtcchat.html] Discarding message from unexpected origin:', event.origin);
+              return;
+          }
+
+          const data = event.data;
+          // console.log('[webrtcchat.html] Received command from parent:', data);
+
+          if (data && data.type === 'sendDigitalHumanEcho') {
+              const messageText = data.text;
+              const sessionId = data.sessionId; // Use the sessionId from the command
+
+              if (messageText && sessionId) {
+                  console.log(`[webrtcchat.html] Executing 'echo' command from parent. Session ID: ${sessionId}, Text: ${messageText}`);
+                  fetch('/human', {
+                      body: JSON.stringify({
+                          text: messageText,
+                          type: 'echo',
+                          interrupt: true, // Or make this configurable if needed
+                          sessionid: parseInt(sessionId),
+                      }),
+                      headers: {
+                          'Content-Type': 'application/json'
+                      },
+                      method: 'POST'
+                  }).then(response => {
+                      if (!response.ok) {
+                          console.error('[webrtcchat.html] Failed to send digital human echo via parent command. Status:', response.status);
+                      } else {
+                          console.log('[webrtcchat.html] Digital human echo command sent successfully.');
+                      }
+                  }).catch(error => {
+                      console.error('[webrtcchat.html] Error sending digital human echo command:', error);
+                  });
+              } else {
+                  console.warn('[webrtcchat.html] Received sendDigitalHumanEcho command but text or sessionId is missing.', data);
+              }
+          }
+      });
+
 	});
 
-  
+    document.addEventListener('DOMContentLoaded', () => {
+        const sessionIdInput = document.getElementById('sessionid');
+        if (!sessionIdInput) {
+            console.error('[webrtcchat.html] 未找到 Session ID 输入字段。');
+            return;
+        }
+
+        const sendSessionIdToParent = (sessionId) => {
+            if (window.self !== window.top) { // 检查是否在 iframe 中
+                const parentOrigin = 'http://localhost:8001'; // setting.html 的源
+                console.log(`[webrtcchat.html] Session ID 为: ${sessionId}。正在发送到父窗口 ${parentOrigin}。`);
+                window.parent.postMessage({ type: 'webrtcSessionId', sessionId: sessionId }, parentOrigin);
+            } else {
+                // console.log('[webrtcchat.html] Session ID 已更改，但不在 iframe 中。');
+            }
+        };
+
+        // 初始检查，以防 client.js 在观察者附加之前设置了值
+        if (sessionIdInput.value && sessionIdInput.value !== '0' && sessionIdInput.value.trim() !== '') {
+            sendSessionIdToParent(sessionIdInput.value);
+        }
+
+        const observer = new MutationObserver((mutationsList, obs) => {
+            for (const mutation of mutationsList) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+                    const newSessionId = sessionIdInput.value;
+                    // 确保它是一个有意义的 ID，而不是初始的 "0" 或空值
+                    if (newSessionId && newSessionId !== '0' && newSessionId.trim() !== '') {
+                        sendSessionIdToParent(newSessionId);
+                        // 可选：如果会话 ID 设置一次后不再更改，则断开观察者
+                        // obs.disconnect();
+                    }
+                }
+            }
+        });
+
+        observer.observe(sessionIdInput, { attributes: true });
+    });
 </script>
 </html>
