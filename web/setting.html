@@ -857,7 +857,7 @@
 
                     <!-- 其他标签页的单栏布局 -->
                     <div v-else class="standard-tab-content">
-                        <div v-show="activeTab === 'voiceUpload'" class="upload-container" data-aos="fade-up">
+                        <div v-show="activeTab === 'voiceUpload'" class="upload-container">
                             <h2 class="section-title">
                                 <el-icon><microphone /></el-icon>
                                 自定义语音上传
@@ -960,7 +960,7 @@
                             </el-alert>
                         </div>
 
-                        <div v-show="activeTab === 'avatarUpload'" class="upload-container" data-aos="fade-up">
+                        <div v-show="activeTab === 'avatarUpload'" class="upload-container">
                             <h2 class="section-title">
                                 <el-icon><avatar /></el-icon>
                                 数字人形象上传
@@ -1056,7 +1056,7 @@
                             </el-alert>
                         </div>
 
-                        <div v-show="activeTab === 'manage'" class="upload-container" data-aos="fade-up">
+                        <div v-show="activeTab === 'manage'" class="upload-container">
                             <h2 class="section-title">
                                 <el-icon><document /></el-icon>
                                 音色与数字人管理
@@ -1258,7 +1258,7 @@
                             </el-tabs>
                         </div>
 
-                        <div v-show="activeTab === 'service'" class="upload-container" data-aos="fade-up">
+                        <div v-show="activeTab === 'service'" class="upload-container">
                             <h2 class="section-title">
                                 <el-icon><video-play /></el-icon>
                                 数字人服务管理
@@ -1360,7 +1360,7 @@
                             </div>
                         </div>
 
-                        <div v-show="activeTab === 'roleConfig'" class="upload-container" data-aos="fade-up">
+                        <div v-show="activeTab === 'roleConfig'" class="upload-container">
                             <h2 class="section-title">
                                 <el-icon><tickets /></el-icon>
                                 角色配置
@@ -1403,7 +1403,7 @@
                                     />
                                 </el-form-item>
 
-                                <el-form-item label="话术库 (一行一条，支持变量)">
+                                <el-form-item label="话术库 (一行一条，支持变量)，尚未实际生效">
                                     <el-input
                                         v-model="roleConfigForm.scriptLibraryText"
                                         type="textarea"
