@@ -852,6 +852,51 @@
                                 </el-card>
                             </div>
                             <!-- /话术轮播控制 -->
+
+                            <!-- 新增：远程 iframe 控制卡片 -->
+                            <el-card class="box-card" style="margin-top: 20px;">
+                                <template #header>
+                                    <div class="card-header">
+                                        <span>远程 iframe 控制</span>
+                                    </div>
+                                </template>
+                                <el-form label-position="top">
+                                    <el-form-item label="iFrame 控件显隐">
+                                        <el-button @click="() => sendControlsVisibilityCommand(true)" size="small">显示 iframe 控件</el-button>
+                                        <el-button @click="() => sendControlsVisibilityCommand(false)" size="small">隐藏 iframe 控件</el-button>
+                                    </el-form-item>
+
+                                    <el-form-item label="STUN 服务器">
+                                        <el-switch
+                                            v-model="useStunRemote"
+                                            @change="sendToggleStunCommand"
+                                            active-text="使用 STUN"
+                                            inactive-text="不使用 STUN"
+                                        />
+                                    </el-form-item>
+
+                                    <el-form-item label="WebRTC 连接">
+                                        <el-button type="success" @click="sendStartConnectionCommand" size="small" :disabled="!currentWebRTCSessionId">连接</el-button>
+                                        <el-button type="danger" @click="sendStopConnectionCommand" size="small">断开</el-button>
+                                    </el-form-item>
+
+                                    <el-form-item label="发送聊天消息">
+                                        <el-input v-model="chatMessageRemote" placeholder="输入聊天内容" size="small" style="margin-bottom: 8px;"></el-input>
+                                        <el-button type="primary" @click="sendChatMessageCommand" size="small" :disabled="!currentWebRTCSessionId || !chatMessageRemote.trim()">发送聊天</el-button>
+                                    </el-form-item>
+
+                                    <el-form-item label="手动发送数字人话术">
+                                        <el-input v-model="echoMessageRemote" placeholder="输入要直接说的话" size="small" style="margin-bottom: 8px;"></el-input>
+                                        <el-button type="primary" @click="sendEchoMessageCommand" size="small" :disabled="!currentWebRTCSessionId || !echoMessageRemote.trim()">直接输出</el-button>
+                                    </el-form-item>
+
+                                    <el-form-item label="录制控制">
+                                        <el-button type="info" @click="sendStartRecordCommand" size="small">开始录制</el-button>
+                                        <el-button type="warning" @click="sendStopRecordCommand" size="small">停止录制</el-button>
+                                    </el-form-item>
+                                </el-form>
+                            </el-card>
+                            <!-- /远程 iframe 控制卡片 -->
                         </div>
                     </template>
 
@@ -1525,6 +1570,11 @@
                 const roleConfigLoading = ref(false);
                 const roleConfigResult = ref(null);
 
+                // 新增：远程控制相关 refs
+                const useStunRemote = ref(false); // 默认不使用 STUN，或者可以尝试从 iframe 获取初始状态
+                const chatMessageRemote = ref('');
+                const echoMessageRemote = ref('');
+
                 onMounted(() => {
                     AOS.init({
                         duration: 800,
@@ -1573,6 +1623,19 @@
                     // 重置表单状态
                     voiceResult.value = null;
                     avatarResult.value = null;
+
+                    if (key === 'preview') {
+                        // 当切换到预览标签时，默认尝试隐藏 iframe 内部控件
+                        // 需要确保 previewFrame 已经加载
+                        setTimeout(() => {
+                           if (previewFrame.value && previewFrame.value.contentWindow) {
+                                sendControlsVisibilityCommand(false);
+                            } else {
+                                console.warn('[setting.html] Preview frame not ready to hide controls on tab select.');
+                                // Could add a listener for iframe load if it becomes an issue
+                            }
+                        }, 500); // небольшой таймаут для загрузки iframe
+                    }
                 };
 
                 const toggleSidebar = () => {
@@ -2245,6 +2308,59 @@
                     }
                 };
 
+                // 新增：发送 postMessage 指令的方法
+                const postToIframe = (message) => {
+                    if (previewFrame.value && previewFrame.value.contentWindow) {
+                        previewFrame.value.contentWindow.postMessage(message, 'http://localhost:6006');
+                    } else {
+                        ElMessage.error('预览窗口不可用，无法发送指令。');
+                        console.error('[setting.html] Preview frame not available to post message:', message);
+                    }
+                };
+
+                const sendControlsVisibilityCommand = (visible) => {
+                    postToIframe({ type: 'setControlsVisibility', visible: visible });
+                };
+
+                const sendToggleStunCommand = () => {
+                    postToIframe({ type: 'toggleStun', useStun: useStunRemote.value });
+                };
+
+                const sendStartConnectionCommand = () => {
+                    postToIframe({ type: 'startConnection' });
+                };
+
+                const sendStopConnectionCommand = () => {
+                    postToIframe({ type: 'stopConnection' });
+                };
+
+                const sendChatMessageCommand = () => {
+                    if (!chatMessageRemote.value.trim()) return;
+                    postToIframe({ type: 'sendChatMessage', text: chatMessageRemote.value });
+                    chatMessageRemote.value = ''; // 清空输入框
+                };
+
+                const sendEchoMessageCommand = () => {
+                    if (!echoMessageRemote.value.trim() || !currentWebRTCSessionId.value) {
+                         ElMessage.warning('请输入话术并确保已获取 Session ID');
+                        return;
+                    }
+                    postToIframe({
+                        type: 'sendDigitalHumanEcho',
+                        text: echoMessageRemote.value,
+                        sessionId: currentWebRTCSessionId.value
+                    });
+                    echoMessageRemote.value = ''; // 清空输入框
+                };
+
+                const sendStartRecordCommand = () => {
+                    postToIframe({ type: 'startRecord' });
+                };
+
+                const sendStopRecordCommand = () => {
+                    postToIframe({ type: 'stopRecord' });
+                };
+
                 return {
                     isCollapse,
                     activeTab,
@@ -2306,7 +2422,19 @@
                     currentWebRTCSessionId,
                     startCarousel,
                     stopCarousel,
-                    CircleClose: IconCircleClose
+                    CircleClose: IconCircleClose,
+                    // 新增：远程控制 refs 和方法
+                    useStunRemote,
+                    chatMessageRemote,
+                    echoMessageRemote,
+                    sendControlsVisibilityCommand, // 暴露给模板，虽然目前主要在js内调用
+                    sendToggleStunCommand,
+                    sendStartConnectionCommand,
+                    sendStopConnectionCommand,
+                    sendChatMessageCommand,
+                    sendEchoMessageCommand,
+                    sendStartRecordCommand,
+                    sendStopRecordCommand
                 };
             }
         });

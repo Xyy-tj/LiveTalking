@@ -77,10 +77,23 @@
     .main-content-col {
         display: flex;
         flex-direction: column;
+        flex: 1; /* 新增：确保此列在 main-row 中能分配空间 */
+        min-height: 0; /* 与 flex:1 配合使用，防止内容溢出问题 */
+    }
+    .js-toggleable-control-area.controls-hidden { /* Target the new class */
+        display: none !important;
+    }
+    #toggleControlsBtn {
+        position: fixed; /* Use fixed to keep it on screen even if parent scrolls */
+        top: 10px;
+        right: 10px;
+        z-index: 2000; /* Ensure it's above other elements */
+        padding: 5px 10px;
     }
     </style>
 </head>
 <body>
+<button id="toggleControlsBtn" class="btn btn-sm btn-outline-secondary">Toggle Controls</button>
 
 <div class="container-fluid mt-4 mb-4">
     <h1 class="text-center mb-4">WebRTC 实时互动</h1>
@@ -106,7 +119,7 @@
             </div>
 
             <!-- 对话功能与话术控制合并区 -->
-            <div class="card mb-3">
+            <div class="card mb-3 js-toggleable-control-area">
                 <div class="card-header">
                     互动与控制
                 </div>
@@ -137,7 +150,7 @@
             </div>
         </div>
 
-        <div class="col-lg-4 control-panel">
+        <div class="col-lg-4 control-panel js-toggleable-control-area">
             <!-- STUN 服务器选项 -->
             <div class="card mb-3">
                 <div class="card-header">设置</div>
@@ -177,9 +190,9 @@
                     <button class="btn btn-warning btn-block" id="btn_stop_record" disabled>停止录制</button>
                 </div>
             </div>
-            <input type="hidden" id="sessionid" value="0">
         </div>
     </div>
+    <input type="hidden" id="sessionid" value="0">
 </div>
 
 <script src="client.js"></script>
@@ -430,12 +443,87 @@
               } else {
                   console.warn('[webrtcchat.html] Received sendDigitalHumanEcho command but text or sessionId is missing.', data);
               }
+          } else if (data && data.type === 'toggleStun') {
+              const useStunCheckbox = document.getElementById('use-stun');
+              if (useStunCheckbox) {
+                  useStunCheckbox.checked = data.useStun;
+                  console.log(`[webrtcchat.html] STUN server usage set to: ${data.useStun}`);
+              }
+          } else if (data && data.type === 'startConnection') {
+              console.log('[webrtcchat.html] Received startConnection command from parent.');
+              if (typeof showRtcWarningAndStart === 'function') {
+                  showRtcWarningAndStart();
+              } else if (typeof start === 'function') {
+                  start(); // Fallback if showRtcWarningAndStart is not global
+              } else {
+                  console.error('[webrtcchat.html] start function not found.');
+              }
+          } else if (data && data.type === 'stopConnection') {
+              console.log('[webrtcchat.html] Received stopConnection command from parent.');
+              if (typeof stop === 'function') {
+                  stop();
+              } else {
+                  console.error('[webrtcchat.html] stop function not found.');
+              }
+          } else if (data && data.type === 'sendChatMessage') {
+              const messageText = data.text;
+              const currentSessionId = document.getElementById('sessionid').value;
+              if (messageText && currentSessionId && currentSessionId !== '0') {
+                  console.log(`[webrtcchat.html] Executing 'chat' command from parent. Session ID: ${currentSessionId}, Text: ${messageText}`);
+                  fetch('/human', {
+                      body: JSON.stringify({
+                          text: messageText,
+                          type: 'chat',
+                          interrupt: true,
+                          sessionid: parseInt(currentSessionId),
+                      }),
+                      headers: { 'Content-Type': 'application/json' },
+                      method: 'POST'
+                  });
+                  // Optionally clear a corresponding text area in setting.html via another postMessage if needed
+              } else {
+                  console.warn('[webrtcchat.html] Received sendChatMessage command but text or session ID is invalid/missing.', {text: messageText, sessionId: currentSessionId});
+              }
+          } else if (data && data.type === 'startRecord') {
+              console.log('[webrtcchat.html] Received startRecord command from parent.');
+              $('#btn_start_record').click();
+          } else if (data && data.type === 'stopRecord') {
+              console.log('[webrtcchat.html] Received stopRecord command from parent.');
+              $('#btn_stop_record').click();
+          } else if (data && data.type === 'setControlsVisibility') {
+            // Get all elements that should be toggled
+            const controlsToToggle = document.querySelectorAll('.js-toggleable-control-area');
+            if (controlsToToggle.length > 0) {
+                controlsToToggle.forEach(controlArea => {
+                    if (data.visible) {
+                        controlArea.classList.remove('controls-hidden');
+                    } else {
+                        controlArea.classList.add('controls-hidden');
+                    }
+                });
+                console.log(`[webrtcchat.html] Controls visibility set to: ${data.visible}`);
+            }
           }
+
       });
 
 	});
 
     document.addEventListener('DOMContentLoaded', () => {
+        const toggleBtn = document.getElementById('toggleControlsBtn');
+        // Get all elements that should be toggled
+        const controlsToToggle = document.querySelectorAll('.js-toggleable-control-area');
+
+        if (toggleBtn && controlsToToggle.length > 0) {
+            toggleBtn.addEventListener('click', () => {
+                controlsToToggle.forEach(controlArea => {
+                    controlArea.classList.toggle('controls-hidden');
+                });
+            });
+        } else {
+            console.error('Toggle button or control areas not found.');
+        }
+
         const sessionIdInput = document.getElementById('sessionid');
         if (!sessionIdInput) {
             console.error('[webrtcchat.html] 未找到 Session ID 输入字段。');
