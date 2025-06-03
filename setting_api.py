@@ -1174,5 +1174,15 @@ async def get_role_config_api():
 
 if __name__ == "__main__":
     import uvicorn
-    # init_db() # 不再需要在这里调用，由启动事件处理
-    uvicorn.run("setting_api:app", host="0.0.0.0", port=8001, reload=True) 
+    import sys # 新增导入 sys
+    
+    # 检查是否在 PyInstaller 打包的环境中运行
+    is_frozen = getattr(sys, 'frozen', False)
+    
+    if is_frozen:
+        # 在打包环境中，禁用 reload，并直接传递 app 对象
+        uvicorn.run(app, host="0.0.0.0", port=8001, reload=False, workers=1) # 明确指定 workers=1
+    else:
+        # 在开发环境中，使用字符串形式以便 uv run 正确处理 reload
+        # 或者直接 python setting_api.py 也能 reload
+        uvicorn.run("setting_api:app", host="0.0.0.0", port=8001, reload=True) 
