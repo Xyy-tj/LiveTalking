@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>设置 - LiveTalking</title>
+    <title>LiveTalking 服务管理面板</title>
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
     <!-- 引入 Vue 3 生产版本 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <!-- 引入 Element Plus -->
@@ -189,6 +190,53 @@
             padding: 32px;
             transition: all 0.3s ease;
             background-color: var(--page-background);
+            display: flex; /* 新增：使 main-content 成为 flex 容器 */
+            height: calc(100vh - 64px); /* 假设顶部 header 高度，或根据实际情况调整 */
+            overflow: hidden; /* 防止 main-content 自身滚动 */
+        }
+
+        .fixed-preview-panel {
+            width: 40%; /* 左侧预览区域宽度 */
+            min-width: 400px; /* 最小宽度 */
+            height: 100%;
+            padding-right: 16px; /* 与右侧内容区域的间隔 */
+            display: flex;
+            flex-direction: column;
+            background-color: #fff; /* 背景色，以便区分 */
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .fixed-preview-panel .preview-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .fixed-preview-panel .preview-iframe-container {
+            flex: 1;
+            overflow: hidden; /* 确保 iframe 不会超出 */
+            padding: 16px; /* 给 iframe 一点边距 */
+        }
+
+        .fixed-preview-panel .preview-iframe {
+             width: 100%;
+             height: 100%;
+             border: 1px solid var(--border-color); /* 给 iframe 一个边框 */
+             border-radius: 4px;
+        }
+
+        .scrollable-content-panel {
+            flex: 1; /* 占据剩余空间 */
+            height: 100%;
+            overflow-y: auto; /* 允许右侧内容滚动 */
+            padding-left: 16px; /* 与左侧预览区域的间隔 */
+        }
+
+        /* 新增：用于非预览标签页的容器 */
+        .standard-tab-content {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
         }
 
         .upload-container {
@@ -573,11 +621,94 @@
             display: flex;
             gap: 8px;
         }
+
+        /* Authorization Screen Styles */
+        .auth-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: var(--page-background);
+            padding: 20px;
+        }
+
+        .auth-card {
+            width: 100%;
+            max-width: 480px; /* Increased width for better layout */
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1); /* Enhanced shadow */
+        }
+
+        .auth-card .card-header span {
+            font-size: 22px; /* Slightly larger */
+            font-weight: 600;
+            color: var(--primary-text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .auth-card .el-form-item__label {
+            font-size: 14px !important; /* Ensure consistency */
+            margin-bottom: 8px !important;
+        }
+
+        .auth-card .el-input__wrapper {
+             max-width: none; /* Override previous max-width for this specific input */
+        }
+
+        .auth-form-actions {
+            margin-top: 24px;
+        }
+        
+        .auth-tip {
+            margin-top: 24px;
+            font-size: 13px;
+            color: var(--secondary-text);
+        }
+
+        /* Re-authorize button style */
+        .reauth-button-container {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            padding: 0 10px; 
+            box-sizing: border-box;
+        }
+
+        .sidebar.collapsed .reauth-button-container {
+            padding: 0 4px; /* Adjust for collapsed state */
+        }
+        
+        .sidebar .reauth-button-container .el-button {
+            width: 100%;
+            max-width: calc(100% - 16px); /* Ensure padding within button container */
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .sidebar:not(.collapsed) .reauth-button-container .el-button .el-icon + span {
+            margin-left: 8px;
+        }
+
+        .sidebar.collapsed .reauth-button-container .el-button span:not(.el-icon) {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div id="app">
-        <div class="page-container">
+        <!-- Authorization Screen -->
+        <!-- <div v-if="!isAuthorized" class="auth-screen" data-aos="fade-in"> ... </div> -->
+
+        <!-- Main Application Content -->
+        <!-- <div v-else class="page-container"> --> <!-- v-else removed -->
+        <div class="page-container"> <!-- Always show main container, backend handles redirection -->
             <el-container>
                 <el-aside :width="isCollapse ? '64px' : '240px'" class="sidebar" :class="{ collapsed: isCollapse }">
                     <div class="sidebar-title">Digital Human Panel</div>
@@ -591,567 +722,62 @@
                         @select="handleSelect">
                         <el-menu-item index="voiceUpload">
                             <el-icon><microphone /></el-icon>
-                            <template #title>自定义语音上传</template>
+                            <template #title>自定义音色</template>
                         </el-menu-item>
                         <el-menu-item index="avatarUpload">
                             <el-icon><avatar /></el-icon>
-                            <template #title>数字人形象上传</template>
+                            <template #title>自定义形象</template>
                         </el-menu-item>
                         <el-menu-item index="manage">
                             <el-icon><document /></el-icon>
-                            <template #title>管理</template>
+                            <template #title>数字人数据管理</template>
+                        </el-menu-item>
+                        <el-menu-item index="roleConfig">
+                            <el-icon><tickets /></el-icon>
+                            <template #title>角色预设</template>
                         </el-menu-item>
                         <el-menu-item index="service">
-                            <el-icon><video-play /></el-icon>
-                            <template #title>服务管理</template>
+                            <el-icon><setting /></el-icon>
+                            <template #title>数字人直播服务</template>
                         </el-menu-item>
                         <el-menu-item index="preview">
                             <el-icon><video-play /></el-icon>
-                            <template #title>实时预览</template>
+                            <template #title>实时预览控制台</template>
                         </el-menu-item>
+                        
                     </el-menu>
+                    <!-- Re-authorize Button -->
+                    <div class="reauth-button-container" v-if="!isCollapse">
+                        <el-button type="warning" :icon="Unlock" @click="goToReauth" plain>
+                            重新授权
+                        </el-button>
+                    </div>
+                     <div class="reauth-button-container" v-if="isCollapse">
+                        <el-tooltip content="重新授权" placement="right">
+                            <el-button type="warning" :icon="Unlock" @click="goToReauth" plain circle />
+                        </el-tooltip>
+                    </div>
                 </el-aside>
                 
                 <el-main class="main-content">
-                    <div v-show="activeTab === 'voiceUpload'" class="upload-container" data-aos="fade-up">
-                        <h2 class="section-title">
-                            <el-icon><microphone /></el-icon>
-                            自定义语音上传
-                        </h2>
-
-                        <div class="feature-tags">
-                            <span class="feature-tag">
-                                <el-icon><document /></el-icon>
-                                支持多种音频格式
-                            </span>
-                            <span class="feature-tag">
-                                <el-icon><upload /></el-icon>
-                                最大50MB
-                            </span>
-                            <span class="feature-tag">
-                                <el-icon><timer /></el-icon>
-                                快速处理
-                            </span>
-                        </div>
-
-                        <div class="upload-steps">
-                            <h3>上传步骤</h3>
-                            <ol>
-                                <li>选择或拖拽音频文件到上传区域</li>
-                                <li>设置音色前缀（可选）</li>
-                                <li>确认目标模型</li>
-                                <li>点击上传按钮开始处理</li>
-                            </ol>
-                        </div>
-
-                        <el-form :model="voiceForm" label-position="top">
-                            <el-form-item label="语音文件">
-                                <el-upload
-                                    class="upload-demo"
-                                    drag
-                                    action="/upload_voice"
-                                    :on-change="handleVoiceFileChange"
-                                    :before-upload="beforeVoiceUpload"
-                                    :auto-upload="false">
-                                    <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-                                    <div class="el-upload__text">
-                                        将文件拖到此处，或<em>点击上传</em>
-                                    </div>
-                                    <template #tip>
-                                        <div class="el-upload__tip">
-                                            支持 MP3, WAV, AAC 等音频格式，文件大小不超过 50MB
-                                        </div>
-                                    </template>
-                                </el-upload>
-                                <div v-if="voiceFileInfo" class="file-info" :class="voiceFileInfo.type">
-                                    {{ voiceFileInfo.message }}
-                                </div>
-                                <div class="preview-container" v-if="audioPreview">
-                                    <h4>音频预览</h4>
-                                    <div class="audio-preview">
-                                        <audio controls :src="audioPreview"></audio>
-                                    </div>
-                                </div>
-                                <div class="preview-container" v-else>
-                                    <div class="preview-placeholder">
-                                        <el-icon><headset /></el-icon>
-                                        <div>上传音频后可在此处预览</div>
-                                    </div>
-                                </div>
-                            </el-form-item>
-                            
-                            <el-form-item label="音色前缀">
-                                <el-input 
-                                    v-model="voiceForm.prefix" 
-                                    placeholder="自定义音色前缀"
-                                    clearable>
-                                    <template #prefix>
-                                        <el-icon><edit /></el-icon>
-                                    </template>
-                                </el-input>
-                            </el-form-item>
-                            
-                            <el-form-item label="目标模型">
-                                <el-select v-model="voiceForm.targetModel" placeholder="请选择目标模型" class="w-100">
-                                    <el-option label="CosyVoice V2" value="cosyvoice-v2" />
-                                    <el-option label="CosyVoice V1" value="cosyvoice-v1" />
-                                </el-select>
-                            </el-form-item>
-                            
-                            <el-form-item>
-                                <el-button type="primary" @click="submitVoiceForm" :loading="uploading">
-                                    {{ uploading ? '处理中...' : '上传并创建音色' }}
-                                </el-button>
-                            </el-form-item>
-                        </el-form>
-                        
-                        <el-alert
-                            v-if="voiceResult"
-                            :title="voiceResult.title"
-                            :type="voiceResult.type"
-                            show-icon>
-                            <template #description>
-                                <div v-html="voiceResult.message"></div>
-                            </template>
-                        </el-alert>
-                    </div>
-
-                    <div v-show="activeTab === 'avatarUpload'" class="upload-container" data-aos="fade-up">
-                        <h2 class="section-title">
-                            <el-icon><avatar /></el-icon>
-                            数字人形象上传
-                        </h2>
-
-                        <div class="feature-tags">
-                            <span class="feature-tag">
-                                <el-icon><video-camera /></el-icon>
-                                支持MP4格式
-                            </span>
-                            <span class="feature-tag">
-                                <el-icon><upload /></el-icon>
-                                最大200MB
-                            </span>
-                            <span class="feature-tag">
-                                <el-icon><picture-filled /></el-icon>
-                                高清画质
-                            </span>
-                        </div>
-
-                        <div class="upload-steps">
-                            <h3>上传步骤</h3>
-                            <ol>
-                                <li>准备符合要求的MP4视频文件</li>
-                                <li>为你的数字人形象命名</li>
-                                <li>上传文件并等待处理完成</li>
-                                <li>查看生成结果</li>
-                            </ol>
-                        </div>
-
-                        <el-form :model="avatarForm" label-position="top">
-                            <el-form-item label="MP4视频文件">
-                                <el-upload
-                                    class="upload-demo"
-                                    drag
-                                    action="/upload_avatar"
-                                    :on-change="handleAvatarFileChange"
-                                    :before-upload="beforeAvatarUpload"
-                                    :auto-upload="false">
-                                    <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-                                    <div class="el-upload__text">
-                                        将文件拖到此处，或<em>点击上传</em>
-                                    </div>
-                                    <template #tip>
-                                        <div class="el-upload__tip">
-                                            仅支持 MP4 格式视频，文件大小不超过 200MB
-                                        </div>
-                                    </template>
-                                </el-upload>
-                                <div v-if="avatarFileInfo" class="file-info" :class="avatarFileInfo.type">
-                                    {{ avatarFileInfo.message }}
-                                </div>
-                                <div class="preview-container" v-if="videoPreview">
-                                    <h4>视频预览</h4>
-                                    <div class="video-preview">
-                                        <video controls :src="videoPreview"></video>
-                                    </div>
-                                </div>
-                                <div class="preview-container" v-else>
-                                    <div class="preview-placeholder">
-                                        <el-icon><video-camera /></el-icon>
-                                        <div>上传视频后可在此处预览</div>
-                                    </div>
-                                </div>
-                            </el-form-item>
-                            
-                            <el-form-item label="形象名称">
-                                <el-input 
-                                    v-model="avatarForm.name" 
-                                    placeholder="为你的数字人形象起个名字"
-                                    clearable>
-                                    <template #prefix>
-                                        <el-icon><user /></el-icon>
-                                    </template>
-                                </el-input>
-                            </el-form-item>
-                            
-                            <el-form-item>
-                                <el-button type="primary" @click="submitAvatarForm" :loading="avatarUploading">
-                                    {{ avatarUploading ? '处理中...' : '上传并生成形象' }}
-                                </el-button>
-                            </el-form-item>
-                        </el-form>
-                        
-                        <el-alert
-                            v-if="avatarResult"
-                            :title="avatarResult.title"
-                            :type="avatarResult.type"
-                            show-icon>
-                            <template #description>
-                                <div v-html="avatarResult.message"></div>
-                            </template>
-                        </el-alert>
-                    </div>
-
-                    <div v-show="activeTab === 'manage'" class="upload-container" data-aos="fade-up">
-                        <h2 class="section-title">
-                            <el-icon><document /></el-icon>
-                            音色与数字人管理
-                        </h2>
-                        <el-tabs v-model="manageTab" @tab-click="handleTabClick">
-                            <el-tab-pane label="音色管理" name="voices">
-                                <div v-if="!voiceList || voiceList.length === 0">
-                                    <el-empty description="暂无音色数据" />
-                                </div>
-                                <div v-else>
-                                    <el-table :data="voiceList" style="width: 100%" v-loading="voiceLoading">
-                                        <el-table-column 
-                                            label="音色ID" 
-                                            min-width="400"
-                                            show-overflow-tooltip
-                                        >
-                                            <template #default="scope">
-                                                <div class="voice-id-cell">
-                                                    <span class="voice-id-text">{{ scope.row.voice_id }}</span>
-                                                    <div class="copy-button-wrapper">
-                                                        <div class="copy-button" @click.stop="copyToClipboard(scope.row.voice_id)">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" style="fill: currentColor">
-                                                                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                                                            </svg>
-                                                            <span>复制</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </template>
-                                        </el-table-column>
-                                        <el-table-column 
-                                            prop="file_url" 
-                                            label="文件路径" 
-                                            min-width="300" 
-                                            show-overflow-tooltip
-                                        >
-                                            <template #default="scope">
-                                                <el-link type="primary" :href="scope.row.file_url" target="_blank">
-                                                    {{ scope.row.file_url }}
-                                                </el-link>
-                                            </template>
-                                        </el-table-column>
-                                        <el-table-column prop="prefix" label="前缀" min-width="120">
-                                            <template #default="scope">
-                                                <el-input 
-                                                    v-model="scope.row.prefix" 
-                                                    size="small"
-                                                    placeholder="请输入前缀"
-                                                    @change="value => handleVoicePrefixChange(scope.row, value)"
-                                                />
-                                            </template>
-                                        </el-table-column>
-                                        <el-table-column prop="target_model" label="目标模型" min-width="120" />
-                                        <el-table-column prop="created_at" label="创建时间" min-width="180">
-                                            <template #default="scope">
-                                                {{ formatDate(scope.row.created_at) }}
-                                            </template>
-                                        </el-table-column>
-                                        <el-table-column label="操作" width="160" fixed="right">
-                                            <template #default="scope">
-                                                <el-button-group>
-                                                    <el-button 
-                                                        size="small" 
-                                                        type="primary" 
-                                                        :loading="scope.row.saving"
-                                                        @click="updateVoice(scope.row)"
-                                                    >
-                                                        保存
-                                                    </el-button>
-                                                    <el-popconfirm
-                                                        title="确定要删除这个音色吗？"
-                                                        @confirm="deleteVoice(scope.row)"
-                                                    >
-                                                        <template #reference>
-                                                            <el-button 
-                                                                size="small" 
-                                                                type="danger" 
-                                                                :loading="scope.row.deleting"
-                                                            >
-                                                                删除
-                                                            </el-button>
-                                                        </template>
-                                                    </el-popconfirm>
-                                                </el-button-group>
-                                            </template>
-                                        </el-table-column>
-                                    </el-table>
-                                </div>
-                            </el-tab-pane>
-                            <el-tab-pane label="数字人管理" name="avatars">
-                                <div v-if="!avatarList || avatarList.length === 0">
-                                    <el-empty description="暂无数字人数据" />
-                                </div>
-                                <div v-else>
-                                    <el-table :data="avatarList" style="width: 100%" v-loading="avatarLoading">
-                                        <el-table-column 
-                                            label="数字人ID" 
-                                            min-width="180" 
-                                            show-overflow-tooltip
-                                        >
-                                            <template #default="scope">
-                                                <div class="voice-id-cell">
-                                                    <span class="voice-id-text">{{ scope.row.avatar_id }}</span>
-                                                    <div class="copy-button-wrapper">
-                                                        <div class="copy-button" @click.stop="copyToClipboard(scope.row.avatar_id)">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" style="fill: currentColor">
-                                                                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                                                            </svg>
-                                                            <span>复制</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </template>
-                                        </el-table-column>
-                                        <el-table-column prop="file_url" label="文件路径" min-width="200" show-overflow-tooltip>
-                                            <template #default="scope">
-                                                <el-link v-if="scope.row.file_url" type="primary" :href="scope.row.file_url" target="_blank">
-                                                    {{ scope.row.file_url }}
-                                                </el-link>
-                                                <span v-else>处理中</span>
-                                            </template>
-                                        </el-table-column>
-                                        <el-table-column prop="name" label="名称" min-width="120">
-                                            <template #default="scope">
-                                                <el-input 
-                                                    v-model="scope.row.name" 
-                                                    size="small"
-                                                    placeholder="请输入名称"
-                                                    @change="value => handleAvatarNameChange(scope.row, value)"
-                                                />
-                                            </template>
-                                        </el-table-column>
-                                        <el-table-column prop="status" label="状态" min-width="180">
-                                            <template #default="scope">
-                                                <div style="display: flex; align-items: center; gap: 8px;">
-                                                    <el-tag
-                                                        :type="getStatusType(scope.row.status)"
-                                                        size="small"
-                                                    >
-                                                        {{ getStatusText(scope.row.status) }}
-                                                    </el-tag>
-                                                    <el-progress
-                                                        v-if="scope.row.status === 'processing'"
-                                                        :percentage="scope.row.progress || 0"
-                                                        :stroke-width="15"
-                                                        :show-text="true"
-                                                        style="flex: 1; margin-left: 8px;"
-                                                    />
-                                                    <el-tooltip
-                                                        v-if="scope.row.error_message"
-                                                        :content="scope.row.error_message"
-                                                        placement="top"
-                                                    >
-                                                        <el-icon class="error-icon" style="color: #F56C6C; cursor: pointer;">
-                                                            <warning />
-                                                        </el-icon>
-                                                    </el-tooltip>
-                                                </div>
-                                            </template>
-                                        </el-table-column>
-                                        <el-table-column prop="created_at" label="创建时间" min-width="180">
-                                            <template #default="scope">
-                                                {{ formatDate(scope.row.created_at) }}
-                                            </template>
-                                        </el-table-column>
-                                        <el-table-column label="操作" width="160" fixed="right">
-                                            <template #default="scope">
-                                                <el-button-group>
-                                                    <el-button 
-                                                        size="small" 
-                                                        type="primary" 
-                                                        :loading="scope.row.saving"
-                                                        @click="updateAvatar(scope.row)"
-                                                        :disabled="scope.row.status === 'processing'"
-                                                    >
-                                                        保存
-                                                    </el-button>
-                                                    <el-popconfirm
-                                                        title="确定要删除这个数字人吗？"
-                                                        @confirm="deleteAvatar(scope.row)"
-                                                    >
-                                                        <template #reference>
-                                                            <el-button 
-                                                                size="small" 
-                                                                type="danger" 
-                                                                :loading="scope.row.deleting"
-                                                                :disabled="scope.row.status === 'processing'"
-                                                            >
-                                                                删除
-                                                            </el-button>
-                                                        </template>
-                                                    </el-popconfirm>
-                                                </el-button-group>
-                                            </template>
-                                        </el-table-column>
-                                    </el-table>
-                                </div>
-                            </el-tab-pane>
-                        </el-tabs>
-                    </div>
-
-                    <div v-show="activeTab === 'service'" class="upload-container" data-aos="fade-up">
-                        <h2 class="section-title">
-                            <el-icon><video-play /></el-icon>
-                            数字人服务管理
-                        </h2>
-
-                        <div class="feature-tags">
-                            <span class="feature-tag">
-                                <el-icon><connection /></el-icon>
-                                实时状态监控
-                            </span>
-                            <span class="feature-tag">
-                                <el-icon><setting /></el-icon>
-                                参数配置
-                            </span>
-                            <span class="feature-tag">
-                                <el-icon><video-play /></el-icon>
-                                一键启动
-                            </span>
-                        </div>
-
-                        <el-form :model="serviceForm" label-position="top" style="margin-top: 24px;">
-                            <el-form-item label="音色ID">
-                                <el-select 
-                                    v-model="serviceForm.voice_id" 
-                                    placeholder="请选择音色"
-                                    style="width: 100%;"
-                                    filterable
-                                >
-                                    <el-option
-                                        v-for="voice in voiceList"
-                                        :key="voice.voice_id"
-                                        :label="voice.prefix || voice.voice_id"
-                                        :value="voice.voice_id"
-                                    >
-                                        <span style="float: left">{{ voice.prefix || '未命名' }}</span>
-                                        <span style="float: right; color: #8492a6; font-size: 13px">
-                                            {{ voice.voice_id }}
-                                        </span>
-                                    </el-option>
-                                </el-select>
-                            </el-form-item>
-
-                            <el-form-item label="数字人ID">
-                                <el-select 
-                                    v-model="serviceForm.avatar_id" 
-                                    placeholder="请选择数字人"
-                                    style="width: 100%;"
-                                    filterable
-                                >
-                                    <el-option
-                                        v-for="avatar in avatarList"
-                                        :key="avatar.avatar_id"
-                                        :label="avatar.name || avatar.avatar_id"
-                                        :value="avatar.avatar_id"
-                                        :disabled="avatar.status !== 'completed'"
-                                    >
-                                        <span style="float: left">{{ avatar.name || '未命名' }}</span>
-                                        <span style="float: right; color: #8492a6; font-size: 13px">
-                                            {{ avatar.avatar_id }}
-                                        </span>
-                                    </el-option>
-                                </el-select>
-                            </el-form-item>
-
-                            <el-form-item label="其他参数">
-                                <el-input
-                                    v-model="serviceForm.extraParams"
-                                    type="textarea"
-                                    :rows="3"
-                                    placeholder="每行一个参数，格式：--参数名 参数值"
-                                />
-                            </el-form-item>
-
-                            <el-form-item>
-                                <el-button 
-                                    type="primary" 
-                                    :loading="serviceForm.starting" 
-                                    @click="startService"
-                                    :disabled="!serviceForm.voice_id || !serviceForm.avatar_id"
-                                >
-                                    {{ serviceForm.running ? '停止服务' : '启动服务' }}
-                                </el-button>
-                            </el-form-item>
-                        </el-form>
-
-                        <div v-if="serviceForm.running" class="service-status">
-                            <h3>服务状态</h3>
-                            <el-card class="status-card">
-                                <template #header>
-                                    <div class="card-header">
-                                        <span>运行信息</span>
-                                        <el-tag type="success" size="small">运行中</el-tag>
-                                    </div>
-                                </template>
-                                <div class="log-content">
-                                    <pre v-html="serviceForm.logs"></pre>
-                                </div>
-                            </el-card>
-                        </div>
-                    </div>
-
-                    <div v-show="activeTab === 'preview'" class="upload-container" data-aos="fade-up">
-                        <h2 class="section-title">
-                            <el-icon><video-play /></el-icon>
-                            实时预览
-                        </h2>
-
-                        <div class="feature-tags">
-                            <span class="feature-tag">
-                                <el-icon><video-camera /></el-icon>
-                                实时画面
-                            </span>
-                            <span class="feature-tag">
-                                <el-icon><microphone /></el-icon>
-                                实时音频
-                            </span>
-                            <span class="feature-tag">
-                                <el-icon><connection /></el-icon>
-                                低延迟
-                            </span>
-                        </div>
-
-                        <div class="preview-container">
+                    <!-- 条件渲染：仅当 activeTab 为 'preview' 时使用双栏布局 -->
+                    <template v-if="activeTab === 'preview'">
+                        <!-- 左侧固定预览区域 -->
+                        <div class="fixed-preview-panel">
                             <div class="preview-header">
-                                <h3 style="margin: 0;">预览窗口</h3>
+                                <h3 style="margin: 0; font-size: 18px; color: var(--primary-text);">实时预览窗口</h3>
                                 <div class="preview-actions">
-                                    <el-button 
-                                        type="primary" 
-                                        size="small" 
+                                    <el-button
+                                        type="primary"
+                                        size="small"
                                         @click="refreshPreview"
                                         :icon="Refresh"
                                     >
                                         刷新
                                     </el-button>
-                                    <el-button 
-                                        type="primary" 
-                                        size="small" 
+                                    <el-button
+                                        type="primary"
+                                        size="small"
                                         @click="openInNewWindow"
                                         :icon="Link"
                                     >
@@ -1159,14 +785,707 @@
                                     </el-button>
                                 </div>
                             </div>
-                            <iframe 
-                                ref="previewFrame"
-                                class="preview-iframe" 
-                                :src="previewUrl"
-                                allow="camera; microphone; fullscreen"
-                            ></iframe>
+                            <div class="preview-iframe-container">
+                                <iframe
+                                    ref="previewFrame"
+                                    class="preview-iframe"
+                                    :src="previewUrl"
+                                    allow="camera; microphone; fullscreen"
+                                ></iframe>
+                            </div>
                         </div>
+
+                        <!-- 右侧可滚动内容区域 (仅用于预览的话术轮播) -->
+                        <div class="scrollable-content-panel">
+                            <!-- 话术轮播控制 -->
+                            <div class="upload-container">
+                                <el-card class="box-card" style="margin-top: 0;">
+                                    <template #header>
+                                        <div class="card-header">
+                                            <span>话术轮播调度</span>
+                                            <el-tag v-if="currentWebRTCSessionId" type="success" size="small" style="margin-left: 10px;">
+                                                预览 Session ID: {{ currentWebRTCSessionId }}
+                                            </el-tag>
+                                            <el-tag v-else type="warning" size="small" style="margin-left: 10px;">
+                                                预览 Session ID: 未获取
+                                            </el-tag>
+                                        </div>
+                                    </template>
+                                    <el-form label-position="top">
+                                        <el-form-item label="轮播话术 (每行一条)">
+                                            <el-input
+                                                v-model="carouselScripts"
+                                                type="textarea"
+                                                :rows="5"
+                                                placeholder="请输入话术，每行一条"
+                                                :disabled="isCarouselRunning"
+                                            />
+                                        </el-form-item>
+                                        <el-form-item label="轮播间隔 (秒)">
+                                            <el-input-number
+                                                v-model="carouselIntervalSeconds"
+                                                :min="1"
+                                                :max="3600"
+                                                :disabled="isCarouselRunning"
+                                                style="width: 100%; max-width: 200px;"
+                                            />
+                                        </el-form-item>
+                                        <el-form-item>
+                                            <el-button
+                                                type="success"
+                                                @click="startCarousel"
+                                                :disabled="isCarouselRunning || !currentWebRTCSessionId || !carouselScripts.trim()"
+                                                :icon="VideoPlay"
+                                            >
+                                                开始轮播
+                                            </el-button>
+                                            <el-button
+                                                type="danger"
+                                                @click="stopCarousel"
+                                                :disabled="!isCarouselRunning"
+                                                :icon="CircleClose"
+                                            >
+                                                停止轮播
+                                            </el-button>
+                                        </el-form-item>
+                                    </el-form>
+                                </el-card>
+                            </div>
+                            <!-- /话术轮播控制 -->
+
+                            <!-- 新增：远程 iframe 控制卡片 -->
+                            <el-card class="box-card" style="margin-top: 20px;">
+                                <template #header>
+                                    <div class="card-header">
+                                        <span>远程 iframe 控制</span>
+                                    </div>
+                                </template>
+                                <el-form label-position="top">
+                                    <el-form-item label="iFrame 控件显隐">
+                                        <el-button @click="() => sendControlsVisibilityCommand(true)" size="small">显示 iframe 控件</el-button>
+                                        <el-button @click="() => sendControlsVisibilityCommand(false)" size="small">隐藏 iframe 控件</el-button>
+                                    </el-form-item>
+
+                                    <el-form-item label="STUN 服务器">
+                                        <el-switch
+                                            v-model="useStunRemote"
+                                            @change="sendToggleStunCommand"
+                                            active-text="使用 STUN"
+                                            inactive-text="不使用 STUN"
+                                        />
+                                    </el-form-item>
+
+                                    <el-form-item label="WebRTC 连接">
+                                        <el-button type="success" @click="sendStartConnectionCommand" size="small" :disabled="!currentWebRTCSessionId">连接</el-button>
+                                        <el-button type="danger" @click="sendStopConnectionCommand" size="small">断开</el-button>
+                                    </el-form-item>
+
+                                    <el-form-item label="发送聊天消息">
+                                        <el-input v-model="chatMessageRemote" placeholder="输入聊天内容" size="small" style="margin-bottom: 8px;"></el-input>
+                                        <el-button type="primary" @click="sendChatMessageCommand" size="small" :disabled="!currentWebRTCSessionId || !chatMessageRemote.trim()">发送聊天</el-button>
+                                    </el-form-item>
+
+                                    <el-form-item label="手动发送数字人话术">
+                                        <el-input v-model="echoMessageRemote" placeholder="输入要直接说的话" size="small" style="margin-bottom: 8px;"></el-input>
+                                        <el-button type="primary" @click="sendEchoMessageCommand" size="small" :disabled="!currentWebRTCSessionId || !echoMessageRemote.trim()">直接输出</el-button>
+                                    </el-form-item>
+
+                                    <el-form-item label="录制控制">
+                                        <el-button type="info" @click="sendStartRecordCommand" size="small">开始录制</el-button>
+                                        <el-button type="warning" @click="sendStopRecordCommand" size="small">停止录制</el-button>
+                                    </el-form-item>
+                                </el-form>
+                            </el-card>
+                            <!-- /远程 iframe 控制卡片 -->
+                        </div>
+                    </template>
+
+                    <!-- 其他标签页的单栏布局 -->
+                    <div v-else class="standard-tab-content">
+                        <div v-show="activeTab === 'voiceUpload'" class="upload-container">
+                            <h2 class="section-title">
+                                <el-icon><microphone /></el-icon>
+                                自定义语音上传
+                            </h2>
+
+                            <div class="feature-tags">
+                                <span class="feature-tag">
+                                    <el-icon><document /></el-icon>
+                                    支持多种音频格式
+                                </span>
+                                <span class="feature-tag">
+                                    <el-icon><upload /></el-icon>
+                                    最大50MB
+                                </span>
+                                <span class="feature-tag">
+                                    <el-icon><timer /></el-icon>
+                                    快速处理
+                                </span>
+                            </div>
+
+                            <div class="upload-steps">
+                                <h3>上传步骤</h3>
+                                <ol>
+                                    <li>选择或拖拽音频文件到上传区域</li>
+                                    <li>设置音色前缀（可选）</li>
+                                    <li>确认目标模型</li>
+                                    <li>点击上传按钮开始处理</li>
+                                </ol>
+                            </div>
+
+                            <el-form :model="voiceForm" label-position="top">
+                                <el-form-item label="语音文件">
+                                    <el-upload
+                                        class="upload-demo"
+                                        drag
+                                        action="/upload_voice"
+                                        :on-change="handleVoiceFileChange"
+                                        :before-upload="beforeVoiceUpload"
+                                        :auto-upload="false">
+                                        <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+                                        <div class="el-upload__text">
+                                            将文件拖到此处，或<em>点击上传</em>
+                                        </div>
+                                        <template #tip>
+                                            <div class="el-upload__tip">
+                                                支持 MP3, WAV, AAC 等音频格式，文件大小不超过 50MB
+                                            </div>
+                                        </template>
+                                    </el-upload>
+                                    <div v-if="voiceFileInfo" class="file-info" :class="voiceFileInfo.type">
+                                        {{ voiceFileInfo.message }}
+                                    </div>
+                                    <div class="preview-container" v-if="audioPreview">
+                                        <h4>音频预览</h4>
+                                        <div class="audio-preview">
+                                            <audio controls :src="audioPreview"></audio>
+                                        </div>
+                                    </div>
+                                    <div class="preview-container" v-else>
+                                        <div class="preview-placeholder">
+                                            <el-icon><headset /></el-icon>
+                                            <div>上传音频后可在此处预览</div>
+                                        </div>
+                                    </div>
+                                </el-form-item>
+                                
+                                <el-form-item label="音色前缀">
+                                    <el-input 
+                                        v-model="voiceForm.prefix" 
+                                        placeholder="自定义音色前缀"
+                                        clearable>
+                                        <template #prefix>
+                                            <el-icon><edit /></el-icon>
+                                        </template>
+                                    </el-input>
+                                </el-form-item>
+                                
+                                <el-form-item label="目标模型">
+                                    <el-select v-model="voiceForm.targetModel" placeholder="请选择目标模型" class="w-100">
+                                        <el-option label="CosyVoice V2" value="cosyvoice-v2" />
+                                        <el-option label="CosyVoice V1" value="cosyvoice-v1" />
+                                    </el-select>
+                                </el-form-item>
+                                
+                                <el-form-item>
+                                    <el-button type="primary" @click="submitVoiceForm" :loading="uploading">
+                                        {{ uploading ? '处理中...' : '上传并创建音色' }}
+                                    </el-button>
+                                </el-form-item>
+                            </el-form>
+                            
+                            <el-alert
+                                v-if="voiceResult"
+                                :title="voiceResult.title"
+                                :type="voiceResult.type"
+                                show-icon>
+                                <template #description>
+                                    <div v-html="voiceResult.message"></div>
+                                </template>
+                            </el-alert>
+                        </div>
+
+                        <div v-show="activeTab === 'avatarUpload'" class="upload-container">
+                            <h2 class="section-title">
+                                <el-icon><avatar /></el-icon>
+                                数字人形象上传
+                            </h2>
+
+                            <div class="feature-tags">
+                                <span class="feature-tag">
+                                    <el-icon><video-camera /></el-icon>
+                                    支持MP4格式
+                                </span>
+                                <span class="feature-tag">
+                                    <el-icon><upload /></el-icon>
+                                    最大200MB
+                                </span>
+                                <span class="feature-tag">
+                                    <el-icon><picture-filled /></el-icon>
+                                    高清画质
+                                </span>
+                            </div>
+
+                            <div class="upload-steps">
+                                <h3>上传步骤</h3>
+                                <ol>
+                                    <li>准备符合要求的MP4视频文件</li>
+                                    <li>为你的数字人形象命名</li>
+                                    <li>上传文件并等待处理完成</li>
+                                    <li>查看生成结果</li>
+                                </ol>
+                            </div>
+
+                            <el-form :model="avatarForm" label-position="top">
+                                <el-form-item label="MP4视频文件">
+                                    <el-upload
+                                        class="upload-demo"
+                                        drag
+                                        action="/upload_avatar"
+                                        :on-change="handleAvatarFileChange"
+                                        :before-upload="beforeAvatarUpload"
+                                        :auto-upload="false">
+                                        <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+                                        <div class="el-upload__text">
+                                            将文件拖到此处，或<em>点击上传</em>
+                                        </div>
+                                        <template #tip>
+                                            <div class="el-upload__tip">
+                                                仅支持 MP4 格式视频，文件大小不超过 200MB
+                                            </div>
+                                        </template>
+                                    </el-upload>
+                                    <div v-if="avatarFileInfo" class="file-info" :class="avatarFileInfo.type">
+                                        {{ avatarFileInfo.message }}
+                                    </div>
+                                    <div class="preview-container" v-if="videoPreview">
+                                        <h4>视频预览</h4>
+                                        <div class="video-preview">
+                                            <video controls :src="videoPreview"></video>
+                                        </div>
+                                    </div>
+                                    <div class="preview-container" v-else>
+                                        <div class="preview-placeholder">
+                                            <el-icon><video-camera /></el-icon>
+                                            <div>上传视频后可在此处预览</div>
+                                        </div>
+                                    </div>
+                                </el-form-item>
+                                
+                                <el-form-item label="形象名称">
+                                    <el-input 
+                                        v-model="avatarForm.name" 
+                                        placeholder="为你的数字人形象起个名字"
+                                        clearable>
+                                        <template #prefix>
+                                            <el-icon><user /></el-icon>
+                                        </template>
+                                    </el-input>
+                                </el-form-item>
+                                
+                                <el-form-item>
+                                    <el-button type="primary" @click="submitAvatarForm" :loading="avatarUploading">
+                                        {{ avatarUploading ? '处理中...' : '上传并生成形象' }}
+                                    </el-button>
+                                </el-form-item>
+                            </el-form>
+                            
+                            <el-alert
+                                v-if="avatarResult"
+                                :title="avatarResult.title"
+                                :type="avatarResult.type"
+                                show-icon>
+                                <template #description>
+                                    <div v-html="avatarResult.message"></div>
+                                </template>
+                            </el-alert>
+                        </div>
+
+                        <div v-show="activeTab === 'manage'" class="upload-container">
+                            <h2 class="section-title">
+                                <el-icon><document /></el-icon>
+                                音色与数字人管理
+                            </h2>
+                            <el-tabs v-model="manageTab" @tab-click="handleTabClick">
+                                <el-tab-pane label="音色管理" name="voices">
+                                    <div v-if="!voiceList || voiceList.length === 0">
+                                        <el-empty description="暂无音色数据" />
+                                    </div>
+                                    <div v-else>
+                                        <el-table :data="voiceList" style="width: 100%" v-loading="voiceLoading">
+                                            <el-table-column 
+                                                label="音色ID" 
+                                                min-width="400"
+                                                show-overflow-tooltip
+                                            >
+                                                <template #default="scope">
+                                                    <div class="voice-id-cell">
+                                                        <span class="voice-id-text">{{ scope.row.voice_id }}</span>
+                                                        <div class="copy-button-wrapper">
+                                                            <div class="copy-button" @click.stop="copyToClipboard(scope.row.voice_id)">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" style="fill: currentColor">
+                                                                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                                                                </svg>
+                                                                <span>复制</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </el-table-column>
+                                            <el-table-column 
+                                                prop="file_url" 
+                                                label="文件路径" 
+                                                min-width="300" 
+                                                show-overflow-tooltip
+                                            >
+                                                <template #default="scope">
+                                                    <el-link type="primary" :href="scope.row.file_url" target="_blank">
+                                                        {{ scope.row.file_url }}
+                                                    </el-link>
+                                                </template>
+                                            </el-table-column>
+                                            <el-table-column prop="prefix" label="前缀" min-width="120">
+                                                <template #default="scope">
+                                                    <el-input 
+                                                        v-model="scope.row.prefix" 
+                                                        size="small"
+                                                        placeholder="请输入前缀"
+                                                        @change="value => handleVoicePrefixChange(scope.row, value)"
+                                                    />
+                                                </template>
+                                            </el-table-column>
+                                            <el-table-column prop="target_model" label="目标模型" min-width="120" />
+                                            <el-table-column prop="created_at" label="创建时间" min-width="180">
+                                                <template #default="scope">
+                                                    {{ formatDate(scope.row.created_at) }}
+                                                </template>
+                                            </el-table-column>
+                                            <el-table-column label="操作" width="160" fixed="right">
+                                                <template #default="scope">
+                                                    <el-button-group>
+                                                        <el-button 
+                                                            size="small" 
+                                                            type="primary" 
+                                                            :loading="scope.row.saving"
+                                                            @click="updateVoice(scope.row)"
+                                                        >
+                                                            保存
+                                                        </el-button>
+                                                        <el-popconfirm
+                                                            title="确定要删除这个音色吗？"
+                                                            @confirm="deleteVoice(scope.row)"
+                                                        >
+                                                            <template #reference>
+                                                                <el-button 
+                                                                    size="small" 
+                                                                    type="danger" 
+                                                                    :loading="scope.row.deleting"
+                                                                >
+                                                                    删除
+                                                                </el-button>
+                                                            </template>
+                                                        </el-popconfirm>
+                                                    </el-button-group>
+                                                </template>
+                                            </el-table-column>
+                                        </el-table>
+                                    </div>
+                                </el-tab-pane>
+                                <el-tab-pane label="数字人管理" name="avatars">
+                                    <div v-if="!avatarList || avatarList.length === 0">
+                                        <el-empty description="暂无数字人数据" />
+                                    </div>
+                                    <div v-else>
+                                        <el-table :data="avatarList" style="width: 100%" v-loading="avatarLoading">
+                                            <el-table-column 
+                                                label="数字人ID" 
+                                                min-width="180" 
+                                                show-overflow-tooltip
+                                            >
+                                                <template #default="scope">
+                                                    <div class="voice-id-cell">
+                                                        <span class="voice-id-text">{{ scope.row.avatar_id }}</span>
+                                                        <div class="copy-button-wrapper">
+                                                            <div class="copy-button" @click.stop="copyToClipboard(scope.row.avatar_id)">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" style="fill: currentColor">
+                                                                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                                                                </svg>
+                                                                <span>复制</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </el-table-column>
+                                            <el-table-column prop="file_url" label="文件路径" min-width="200" show-overflow-tooltip>
+                                                <template #default="scope">
+                                                    <el-link v-if="scope.row.file_url" type="primary" :href="scope.row.file_url" target="_blank">
+                                                        {{ scope.row.file_url }}
+                                                    </el-link>
+                                                    <span v-else>处理中</span>
+                                                </template>
+                                            </el-table-column>
+                                            <el-table-column prop="name" label="名称" min-width="120">
+                                                <template #default="scope">
+                                                    <el-input 
+                                                        v-model="scope.row.name" 
+                                                        size="small"
+                                                        placeholder="请输入名称"
+                                                        @change="value => handleAvatarNameChange(scope.row, value)"
+                                                    />
+                                                </template>
+                                            </el-table-column>
+                                            <el-table-column prop="status" label="状态" min-width="180">
+                                                <template #default="scope">
+                                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                                        <el-tag
+                                                            :type="getStatusType(scope.row.status)"
+                                                            size="small"
+                                                        >
+                                                            {{ getStatusText(scope.row.status) }}
+                                                        </el-tag>
+                                                        <el-progress
+                                                            v-if="scope.row.status === 'processing'"
+                                                            :percentage="scope.row.progress || 0"
+                                                            :stroke-width="15"
+                                                            :show-text="true"
+                                                            style="flex: 1; margin-left: 8px;"
+                                                        />
+                                                        <el-tooltip
+                                                            v-if="scope.row.error_message"
+                                                            :content="scope.row.error_message"
+                                                            placement="top"
+                                                        >
+                                                            <el-icon class="error-icon" style="color: #F56C6C; cursor: pointer;">
+                                                                <warning />
+                                                            </el-icon>
+                                                        </el-tooltip>
+                                                    </div>
+                                                </template>
+                                            </el-table-column>
+                                            <el-table-column prop="created_at" label="创建时间" min-width="180">
+                                                <template #default="scope">
+                                                    {{ formatDate(scope.row.created_at) }}
+                                                </template>
+                                            </el-table-column>
+                                            <el-table-column label="操作" width="160" fixed="right">
+                                                <template #default="scope">
+                                                    <el-button-group>
+                                                        <el-button 
+                                                            size="small" 
+                                                            type="primary" 
+                                                            :loading="scope.row.saving"
+                                                            @click="updateAvatar(scope.row)"
+                                                            :disabled="scope.row.status === 'processing'"
+                                                        >
+                                                            保存
+                                                        </el-button>
+                                                        <el-popconfirm
+                                                            title="确定要删除这个数字人吗？"
+                                                            @confirm="deleteAvatar(scope.row)"
+                                                        >
+                                                            <template #reference>
+                                                                <el-button 
+                                                                    size="small" 
+                                                                    type="danger" 
+                                                                    :loading="scope.row.deleting"
+                                                                    :disabled="scope.row.status === 'processing'"
+                                                                >
+                                                                    删除
+                                                                </el-button>
+                                                            </template>
+                                                        </el-popconfirm>
+                                                    </el-button-group>
+                                                </template>
+                                            </el-table-column>
+                                        </el-table>
+                                    </div>
+                                </el-tab-pane>
+                            </el-tabs>
+                        </div>
+
+                        <div v-show="activeTab === 'service'" class="upload-container">
+                            <h2 class="section-title">
+                                <el-icon><video-play /></el-icon>
+                                数字人服务管理
+                            </h2>
+
+                            <div class="feature-tags">
+                                <span class="feature-tag">
+                                    <el-icon><connection /></el-icon>
+                                    实时状态监控
+                                </span>
+                                <span class="feature-tag">
+                                    <el-icon><setting /></el-icon>
+                                    参数配置
+                                </span>
+                                <span class="feature-tag">
+                                    <el-icon><video-play /></el-icon>
+                                    一键启动
+                                </span>
+                            </div>
+
+                            <el-form :model="serviceForm" label-position="top" style="margin-top: 24px;">
+                                <el-form-item label="音色ID">
+                                    <el-select 
+                                        v-model="serviceForm.voice_id" 
+                                        placeholder="请选择音色"
+                                        style="width: 100%;"
+                                        filterable
+                                    >
+                                        <el-option
+                                            v-for="voice in voiceList"
+                                            :key="voice.voice_id"
+                                            :label="voice.prefix || voice.voice_id"
+                                            :value="voice.voice_id"
+                                        >
+                                            <span style="float: left">{{ voice.prefix || '未命名' }}</span>
+                                            <span style="float: right; color: #8492a6; font-size: 13px">
+                                                {{ voice.voice_id }}
+                                            </span>
+                                        </el-option>
+                                    </el-select>
+                                </el-form-item>
+
+                                <el-form-item label="数字人ID">
+                                    <el-select 
+                                        v-model="serviceForm.avatar_id" 
+                                        placeholder="请选择数字人"
+                                        style="width: 100%;"
+                                        filterable
+                                    >
+                                        <el-option
+                                            v-for="avatar in avatarList"
+                                            :key="avatar.avatar_id"
+                                            :label="avatar.name || avatar.avatar_id"
+                                            :value="avatar.avatar_id"
+                                            :disabled="avatar.status !== 'completed'"
+                                        >
+                                            <span style="float: left">{{ avatar.name || '未命名' }}</span>
+                                            <span style="float: right; color: #8492a6; font-size: 13px">
+                                                {{ avatar.avatar_id }}
+                                            </span>
+                                        </el-option>
+                                    </el-select>
+                                </el-form-item>
+
+                                <el-form-item label="其他参数">
+                                    <el-input
+                                        v-model="serviceForm.extraParams"
+                                        type="textarea"
+                                        :rows="3"
+                                        placeholder="每行一个参数，格式：--参数名 参数值"
+                                    />
+                                </el-form-item>
+
+                                <el-form-item>
+                                    <el-button 
+                                        type="primary" 
+                                        :loading="serviceForm.starting" 
+                                        @click="startService"
+                                        :disabled="!serviceForm.voice_id || !serviceForm.avatar_id"
+                                    >
+                                        {{ serviceForm.running ? '停止服务' : '启动服务' }}
+                                    </el-button>
+                                </el-form-item>
+                            </el-form>
+
+                            <div v-if="serviceForm.running" class="service-status">
+                                <h3>服务状态</h3>
+                                <el-card class="status-card">
+                                    <template #header>
+                                        <div class="card-header">
+                                            <span>运行信息</span>
+                                            <el-tag type="success" size="small">运行中</el-tag>
+                                        </div>
+                                    </template>
+                                    <div class="log-content">
+                                        <pre v-html="serviceForm.logs"></pre>
+                                    </div>
+                                </el-card>
+                            </div>
+                        </div>
+
+                        <div v-show="activeTab === 'roleConfig'" class="upload-container">
+                            <h2 class="section-title">
+                                <el-icon><tickets /></el-icon>
+                                角色配置
+                            </h2>
+
+                            <div class="feature-tags">
+                                <span class="feature-tag">
+                                    <el-icon><user-filled /></el-icon>
+                                    个性化角色定义
+                                </span>
+                                <span class="feature-tag">
+                                    <el-icon><chat-dot-round /></el-icon>
+                                    智能对话管理
+                                </span>
+                                <span class="feature-tag">
+                                    <el-icon><notebook /></el-icon>
+                                    结构化话术库
+                                </span>
+                            </div>
+
+                            <el-form :model="roleConfigForm" label-position="top" style="margin-top: 24px;">
+                                <el-form-item label="角色名称">
+                                    <el-input
+                                        v-model="roleConfigForm.roleName"
+                                        placeholder="为您的数字人角色起一个名字"
+                                        clearable
+                                    >
+                                        <template #prefix>
+                                            <el-icon><user /></el-icon>
+                                        </template>
+                                    </el-input>
+                                </el-form-item>
+
+                                <el-form-item label="预设提示词 (System Prompt)">
+                                    <el-input
+                                        v-model="roleConfigForm.presetPrompt"
+                                        type="textarea"
+                                        :rows="5"
+                                        placeholder="定义角色的行为、背景和对话风格。例如：你是一个乐于助人的AI助手，专注于解答技术问题。"
+                                    />
+                                </el-form-item>
+
+                                <el-form-item label="话术库 (一行一条，支持变量)，尚未实际生效">
+                                    <el-input
+                                        v-model="roleConfigForm.scriptLibraryText"
+                                        type="textarea"
+                                        :rows="10"
+                                        placeholder="请输入话术，每行一条。您可以使用 {变量名} 的格式插入动态内容。"
+                                    />
+                                    <div class="el-upload__tip" style="margin-top: 8px;">
+                                        例如：欢迎来到我们的直播间，今天我们有特别优惠哦！你好，{userName}！
+                                    </div>
+                                </el-form-item>
+
+                                <el-form-item>
+                                    <el-button
+                                        type="primary"
+                                        :loading="roleConfigLoading"
+                                        @click="submitRoleConfigForm"
+                                    >
+                                        {{ roleConfigLoading ? '保存中...' : '保存配置' }}
+                                    </el-button>
+                                </el-form-item>
+                            </el-form>
+
+                            <el-alert
+                                v-if="roleConfigResult"
+                                :title="roleConfigResult.title"
+                                :type="roleConfigResult.type"
+                                show-icon
+                                closable
+                            >
+                                <template #description>
+                                    <div v-html="roleConfigResult.message"></div>
+                                </template>
+                            </el-alert>
+                        </div>
+
                     </div>
+
                 </el-main>
             </el-container>
         </div>
@@ -1189,6 +1508,14 @@
         const IconVideoCamera = ElementPlusIconsVue.VideoCamera;
         const IconRefresh = ElementPlusIconsVue.Refresh;
         const IconLink = ElementPlusIconsVue.Link;
+        const IconVideoPlay = ElementPlusIconsVue.VideoPlay;
+        const IconSetting = ElementPlusIconsVue.Setting;
+        const IconUnlock = ElementPlusIconsVue.Unlock;
+        const IconTickets = ElementPlusIconsVue.Tickets;
+        const IconUserFilled = ElementPlusIconsVue.UserFilled;
+        const IconChatDotRound = ElementPlusIconsVue.ChatDotRound;
+        const IconNotebook = ElementPlusIconsVue.Notebook;
+        const IconCircleClose = ElementPlusIconsVue.CircleClose;
         
         const app = createApp({
             setup() {
@@ -1220,10 +1547,33 @@
                     extraParams: '',
                     running: false,
                     starting: false,
-                    logs: ''
+                    logs: '',
+                    logPollErrorCount: 0
                 });
                 const previewUrl = ref('http://localhost:6006/webrtcchat.html');
                 const previewFrame = ref(null);
+
+                // 话术轮播相关
+                const carouselScripts = ref('');
+                const carouselIntervalSeconds = ref(10);
+                const isCarouselRunning = ref(false);
+                const carouselTimerId = ref(null);
+                const currentWebRTCSessionId = ref(null); // 将用于存储从iframe获取的session id
+                const currentCarouselIndex = ref(0);
+
+                // 角色配置相关
+                const roleConfigForm = ref({
+                    roleName: '',
+                    presetPrompt: '',
+                    scriptLibraryText: ''
+                });
+                const roleConfigLoading = ref(false);
+                const roleConfigResult = ref(null);
+
+                // 新增：远程控制相关 refs
+                const useStunRemote = ref(false); // 默认不使用 STUN，或者可以尝试从 iframe 获取初始状态
+                const chatMessageRemote = ref('');
+                const echoMessageRemote = ref('');
 
                 onMounted(() => {
                     AOS.init({
@@ -1231,17 +1581,61 @@
                         easing: 'ease-out-cubic',
                         once: true
                     });
-                    if (activeTab.value === 'manage') {
-                        fetchVoices();
-                        fetchAvatars();
+                    fetchVoices();
+                    fetchAvatars();
+                    if (activeTab.value === 'roleConfig') {
+                        fetchRoleConfig(true);
                     }
+
+                    // 监听来自 iframe 的消息
+                    window.addEventListener('message', handleIframeMessage);
                 });
+
+                const goToReauth = () => {
+                    ElMessage.info('正在跳转到授权页面...');
+                    window.location.href = '/logout_and_reauth';
+                };
+
+                // Simplified fetch wrapper to handle common API errors including auth
+                const simplifiedFetch = async (endpoint, options = {}) => {
+                    try {
+                        const response = await fetch(host + endpoint, options);
+                        if (!response.ok) {
+                            if (response.status === 401 || response.status === 403) {
+                                ElMessage.error('授权已失效或访问被拒绝，请重新授权。');
+                                throw new Error('AUTH_FAILURE'); 
+                            }
+                            const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
+                            throw new Error(errorData.message || `API 请求失败，状态码: ${response.status}`);
+                        }
+                        return response;
+                    } catch (error) {
+                        console.error(`API call to ${endpoint} failed:`, error);
+                        if (error.message !== 'AUTH_FAILURE') {
+                             ElMessage.error(`操作失败: ${error.message.substring(0,100)}`);
+                        }
+                        throw error;
+                    }
+                };
 
                 const handleSelect = (key) => {
                     activeTab.value = key;
                     // 重置表单状态
                     voiceResult.value = null;
                     avatarResult.value = null;
+
+                    if (key === 'preview') {
+                        // 当切换到预览标签时，默认尝试隐藏 iframe 内部控件
+                        // 需要确保 previewFrame 已经加载
+                        setTimeout(() => {
+                           if (previewFrame.value && previewFrame.value.contentWindow) {
+                                sendControlsVisibilityCommand(false);
+                            } else {
+                                console.warn('[setting.html] Preview frame not ready to hide controls on tab select.');
+                                // Could add a listener for iframe load if it becomes an issue
+                            }
+                        }, 500); // небольшой таймаут для загрузки iframe
+                    }
                 };
 
                 const toggleSidebar = () => {
@@ -1323,7 +1717,7 @@
                         formData.append('file', voiceFileInfo.value.raw);
                         formData.append('prefix', voiceForm.value.prefix || '');
                         formData.append('targetModel', voiceForm.value.targetModel || '');
-                        const response = await fetch(host + '/upload_voice', {
+                        const response = await simplifiedFetch('/upload_voice', {
                             method: 'POST',
                             body: formData
                         });
@@ -1380,13 +1774,9 @@
                     }
                 };
 
-                // 轮询检查状态的函数
                 const pollAvatarStatus = async (avatar_id) => {
                     try {
-                        const res = await fetch(host + `/avatar_status/${avatar_id}`);
-                        if (!res.ok) {
-                            throw new Error(`HTTP error! status: ${res.status}`);
-                        }
+                        const res = await simplifiedFetch(`/avatar_status/${avatar_id}`);
                         const data = await res.json();
                         if (data.status === 'success') {
                             // 更新列表中对应项的状态
@@ -1410,6 +1800,9 @@
                         }
                     } catch (error) {
                         console.error('Error polling avatar status:', error);
+                        if (error.message === 'AUTH_FAILURE') {
+                            ElMessage.warning('因授权问题，状态轮询已停止。')
+                        }
                     }
                 };
 
@@ -1427,7 +1820,7 @@
                         const formData = new FormData();
                         formData.append('file', avatarFileInfo.value.raw);
                         formData.append('name', avatarForm.value.name || '');
-                        const response = await fetch(host + '/upload_avatar', {
+                        const response = await simplifiedFetch('/upload_avatar', {
                             method: 'POST',
                             body: formData
                         });
@@ -1468,6 +1861,8 @@
                         fetchVoices();
                     } else if (tab.props.name === 'avatars') {
                         fetchAvatars();
+                    } else if (tab.props.name === 'roleConfig') {
+                        fetchRoleConfig(true);
                     }
                 };
 
@@ -1484,10 +1879,7 @@
                 const fetchVoices = async () => {
                     voiceLoading.value = true;
                     try {
-                        const res = await fetch(host + '/list_voices');
-                        if (!res.ok) {
-                            throw new Error(`HTTP error! status: ${res.status}`);
-                        }
+                        const res = await simplifiedFetch('/list_voices');
                         const data = await res.json();
                         console.log('Fetched voices data:', data);
                         if (!Array.isArray(data)) {
@@ -1512,10 +1904,7 @@
                 const fetchAvatars = async () => {
                     avatarLoading.value = true;
                     try {
-                        const res = await fetch(host + '/list_avatars');
-                        if (!res.ok) {
-                            throw new Error(`HTTP error! status: ${res.status}`);
-                        }
+                        const res = await simplifiedFetch('/list_avatars');
                         const data = await res.json();
                         if (!Array.isArray(data)) {
                             throw new Error('Invalid data format received');
@@ -1545,7 +1934,7 @@
                         const formData = new FormData();
                         formData.append('id', row.id);
                         formData.append('prefix', row.prefix);
-                        const res = await fetch(host + '/update_voice', {
+                        const res = await simplifiedFetch('/update_voice', {
                             method: 'POST',
                             body: formData
                         });
@@ -1565,7 +1954,7 @@
                 const deleteVoice = async (row) => {
                     row.deleting = true;
                     try {
-                        const res = await fetch(host + `/delete_voice/${row.voice_id}`, {
+                        const res = await simplifiedFetch(`/delete_voice/${row.voice_id}`, {
                             method: 'DELETE'
                         });
                         if (!res.ok) {
@@ -1597,7 +1986,7 @@
                         if (row.error_message !== undefined) formData.append('error_message', row.error_message);
                         if (row.file_url !== undefined) formData.append('file_url', row.file_url);
                         
-                        const res = await fetch(host + '/update_avatar', {
+                        const res = await simplifiedFetch('/update_avatar', {
                             method: 'POST',
                             body: formData
                         });
@@ -1622,7 +2011,7 @@
                 const deleteAvatar = async (row) => {
                     row.deleting = true;
                     try {
-                        const res = await fetch(host + `/delete_avatar/${row.avatar_id}`, {
+                        const res = await simplifiedFetch(`/delete_avatar/${row.avatar_id}`, {
                             method: 'DELETE'
                         });
                         if (!res.ok) {
@@ -1653,7 +2042,7 @@
                     if (serviceForm.value.running) {
                         // 停止服务
                         try {
-                            const response = await fetch(host + '/stop_service', {
+                            const response = await simplifiedFetch('/stop_service', {
                                 method: 'POST'
                             });
                             const data = await response.json();
@@ -1684,7 +2073,7 @@
                             extra_params: serviceForm.value.extraParams
                         };
 
-                        const response = await fetch(host + '/start_service', {
+                        const response = await simplifiedFetch('/start_service', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
@@ -1714,18 +2103,14 @@
                     if (!serviceForm.value.running) return;
 
                     try {
-                        const response = await fetch(host + '/service_logs');
+                        const response = await simplifiedFetch('/service_logs');
                         const data = await response.json();
                         if (data.status === 'success') {
                             // 格式化日志显示
-                            const formattedLogs = data.logs.map(log => `
-                                <div class="log-entry">
-                                    <span class="log-timestamp">${log.timestamp}</span>
-                                    <span class="log-message log-type-${log.type}">${log.message}</span>
-                                </div>
-                            `).join('');
+                            const formattedLogs = data.logs.map(log => `<div class="log-entry"><span class="log-timestamp">${log.timestamp}</span><span class="log-message log-type-${log.type}">${log.message}</span></div>`).join('');
                             
                             serviceForm.value.logs = formattedLogs;
+                            serviceForm.value.logPollErrorCount = 0;
                             
                             // 如果服务仍在运行，继续轮询
                             if (serviceForm.value.running) {
@@ -1734,9 +2119,41 @@
                         }
                     } catch (error) {
                         console.error('Error polling service logs:', error);
-                        if (serviceForm.value.running) {
-                            setTimeout(pollServiceLogs, 1000);
+                        serviceForm.value.logPollErrorCount++;
+
+                        if (error.message === 'AUTH_FAILURE') {
+                           serviceForm.value.running = false;
+                           ElMessage.warning('因授权问题，服务日志轮询已停止。')
                         }
+                        
+                        if (serviceForm.value.running && serviceForm.value.logPollErrorCount < 3) {
+                            setTimeout(pollServiceLogs, 3000);
+                        } else if (serviceForm.value.running && serviceForm.value.logPollErrorCount >= 3) {
+                            ElMessage.error('服务日志轮询连续失败多次，已暂停。请检查服务状态或网络连接。');
+                        }
+                    }
+                };
+
+                // 获取角色配置
+                const fetchRoleConfig = async (showUpdatedMessage = false) => {
+                    roleConfigLoading.value = true;
+                    try {
+                        const response = await simplifiedFetch('/get_role_config');
+                        const data = await response.json();
+                        if (data.status === 'success' && data.data) {
+                            roleConfigForm.value.roleName = data.data.role_name || '';
+                            roleConfigForm.value.presetPrompt = data.data.preset_prompt || '';
+                            roleConfigForm.value.scriptLibraryText = data.data.script_library_text || '';
+                            if (showUpdatedMessage && data.data.updated_at) {
+                                ElMessage.info(`角色配置上次更新于: ${formatDate(data.data.updated_at)}`);
+                            }
+                        } else {
+                            ElMessage.error(data.message || '获取角色配置失败');
+                        }
+                    } catch (error) {
+                        console.error('获取角色配置失败:', error);
+                    } finally {
+                        roleConfigLoading.value = false;
                     }
                 };
 
@@ -1748,6 +2165,8 @@
                         } else {
                             fetchAvatars();
                         }
+                    } else if (val === 'roleConfig') {
+                        fetchRoleConfig(true);
                     }
                 });
 
@@ -1759,6 +2178,12 @@
                     if (videoPreview.value) {
                         URL.revokeObjectURL(videoPreview.value);
                     }
+                    // 移除事件监听器
+                    window.removeEventListener('message', handleIframeMessage);
+                    // 清除轮播定时器
+                    if (carouselTimerId.value) {
+                        clearInterval(carouselTimerId.value);
+                    }
                 });
 
                 const refreshPreview = () => {
@@ -1769,6 +2194,171 @@
 
                 const openInNewWindow = () => {
                     window.open(previewUrl.value, '_blank');
+                };
+
+                const handleIframeMessage = (event) => {
+                    // console.log('[setting.html] Received message:', event.data);
+                    // 确保消息来源是期望的源
+                    if (event.origin !== 'http://localhost:6006') { // webrtcchat.html 的源
+                        // console.log('[setting.html] Message from unexpected origin:', event.origin);
+                        return;
+                    }
+
+                    if (event.data && event.data.type === 'webrtcSessionId') {
+                        const sessionId = event.data.sessionId;
+                        console.log(`[setting.html] 从预览控制台接收到 WebRTC Session ID: ${sessionId}`);
+                        ElMessage.info(`实时预览 Session ID: ${sessionId}`);
+                        currentWebRTCSessionId.value = sessionId; // 存储 Session ID
+                    }
+                };
+
+                const startCarousel = () => {
+                    if (!currentWebRTCSessionId.value) {
+                        ElMessage.warning('请先确保预览窗口已连接并获取到 Session ID。');
+                        return;
+                    }
+                    const scriptsArray = carouselScripts.value.trim().split('\n').filter(s => s.trim() !== '');
+                    if (scriptsArray.length === 0) {
+                        ElMessage.warning('请输入有效的话术列表。');
+                        return;
+                    }
+
+                    isCarouselRunning.value = true;
+                    currentCarouselIndex.value = 0; // 从头开始
+
+                    if (carouselTimerId.value) {
+                        clearInterval(carouselTimerId.value);
+                    }
+
+                    carouselTimerId.value = setInterval(() => {
+                        if (!previewFrame.value || !previewFrame.value.contentWindow) {
+                            ElMessage.error('无法访问预览窗口。轮播已停止。');
+                            stopCarousel();
+                            return;
+                        }
+                        const scriptToSend = scriptsArray[currentCarouselIndex.value];
+                        console.log(`[setting.html] 发送轮播话术: "${scriptToSend}" 使用 Session ID: ${currentWebRTCSessionId.value}`);
+                        previewFrame.value.contentWindow.postMessage(
+                            {
+                                type: 'sendDigitalHumanEcho',
+                                text: scriptToSend,
+                                sessionId: currentWebRTCSessionId.value
+                            },
+                            'http://localhost:6006' // webrtcchat.html 的源
+                        );
+                        currentCarouselIndex.value = (currentCarouselIndex.value + 1) % scriptsArray.length;
+                    }, carouselIntervalSeconds.value * 1000);
+
+                    ElMessage.success('话术轮播已启动。');
+                };
+
+                const stopCarousel = () => {
+                    if (carouselTimerId.value) {
+                        clearInterval(carouselTimerId.value);
+                        carouselTimerId.value = null;
+                    }
+                    isCarouselRunning.value = false;
+                    ElMessage.info('话术轮播已停止。');
+                };
+
+                const submitRoleConfigForm = async () => {
+                    roleConfigLoading.value = true;
+                    roleConfigResult.value = null;
+                    console.log('提交角色配置:', roleConfigForm.value);
+
+                    try {
+                        const response = await simplifiedFetch('/save_role_config', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(roleConfigForm.value)
+                        });
+                        const data = await response.json();
+
+                        if (data.status === 'success') {
+                            roleConfigResult.value = {
+                                title: '保存成功',
+                                type: 'success',
+                                message: data.message
+                            };
+                            ElMessage.success(data.message);
+                            await fetchRoleConfig(true);
+                        } else {
+                            roleConfigResult.value = {
+                                title: '保存失败',
+                                type: 'error',
+                                message: data.message || '保存角色配置时发生未知错误。'
+                            };
+                            ElMessage.error(data.message || '保存角色配置失败');
+                        }
+                    } catch (error) {
+                        console.error('保存角色配置失败:', error);
+                        let errorMessage = error.message;
+                        if (error.message === 'AUTH_FAILURE') {
+                            errorMessage = '授权失败，无法保存配置。请重新授权。';
+                        } else {
+                            // 其他错误，simplifiedFetch 可能已经提示，这里可以补充或记录
+                        }
+                        roleConfigResult.value = {
+                            title: '保存失败',
+                            type: 'error',
+                            message: `错误: ${errorMessage}`
+                        };
+                    } finally {
+                        roleConfigLoading.value = false;
+                    }
+                };
+
+                // 新增：发送 postMessage 指令的方法
+                const postToIframe = (message) => {
+                    if (previewFrame.value && previewFrame.value.contentWindow) {
+                        previewFrame.value.contentWindow.postMessage(message, 'http://localhost:6006');
+                    } else {
+                        ElMessage.error('预览窗口不可用，无法发送指令。');
+                        console.error('[setting.html] Preview frame not available to post message:', message);
+                    }
+                };
+
+                const sendControlsVisibilityCommand = (visible) => {
+                    postToIframe({ type: 'setControlsVisibility', visible: visible });
+                };
+
+                const sendToggleStunCommand = () => {
+                    postToIframe({ type: 'toggleStun', useStun: useStunRemote.value });
+                };
+
+                const sendStartConnectionCommand = () => {
+                    postToIframe({ type: 'startConnection' });
+                };
+
+                const sendStopConnectionCommand = () => {
+                    postToIframe({ type: 'stopConnection' });
+                };
+
+                const sendChatMessageCommand = () => {
+                    if (!chatMessageRemote.value.trim()) return;
+                    postToIframe({ type: 'sendChatMessage', text: chatMessageRemote.value });
+                    chatMessageRemote.value = ''; // 清空输入框
+                };
+
+                const sendEchoMessageCommand = () => {
+                    if (!echoMessageRemote.value.trim() || !currentWebRTCSessionId.value) {
+                         ElMessage.warning('请输入话术并确保已获取 Session ID');
+                        return;
+                    }
+                    postToIframe({
+                        type: 'sendDigitalHumanEcho',
+                        text: echoMessageRemote.value,
+                        sessionId: currentWebRTCSessionId.value
+                    });
+                    echoMessageRemote.value = ''; // 清空输入框
+                };
+
+                const sendStartRecordCommand = () => {
+                    postToIframe({ type: 'startRecord' });
+                };
+
+                const sendStopRecordCommand = () => {
+                    postToIframe({ type: 'stopRecord' });
                 };
 
                 return {
@@ -1816,8 +2406,35 @@
                     previewFrame,
                     refreshPreview,
                     openInNewWindow,
+                    roleConfigForm,
+                    roleConfigLoading,
+                    roleConfigResult,
+                    submitRoleConfigForm,
                     Refresh: IconRefresh,
-                    Link: IconLink
+                    Link: IconLink,
+                    VideoPlay: IconVideoPlay,
+                    Setting: IconSetting,
+                    Unlock: IconUnlock,
+                    goToReauth,
+                    carouselScripts,
+                    carouselIntervalSeconds,
+                    isCarouselRunning,
+                    currentWebRTCSessionId,
+                    startCarousel,
+                    stopCarousel,
+                    CircleClose: IconCircleClose,
+                    // 新增：远程控制 refs 和方法
+                    useStunRemote,
+                    chatMessageRemote,
+                    echoMessageRemote,
+                    sendControlsVisibilityCommand, // 暴露给模板，虽然目前主要在js内调用
+                    sendToggleStunCommand,
+                    sendStartConnectionCommand,
+                    sendStopConnectionCommand,
+                    sendChatMessageCommand,
+                    sendEchoMessageCommand,
+                    sendStartRecordCommand,
+                    sendStopRecordCommand
                 };
             }
         });
@@ -1834,6 +2451,14 @@
         app.component('VideoCamera', IconVideoCamera);
         app.component('Refresh', IconRefresh);
         app.component('Link', IconLink);
+        app.component('VideoPlay', IconVideoPlay);
+        app.component('Setting', IconSetting);
+        app.component('Unlock', IconUnlock);
+        app.component('Tickets', IconTickets);
+        app.component('UserFilled', IconUserFilled);
+        app.component('ChatDotRound', IconChatDotRound);
+        app.component('Notebook', IconNotebook);
+        app.component('CircleClose', IconCircleClose);
 
         app.use(ElementPlus);
         app.mount('#app');

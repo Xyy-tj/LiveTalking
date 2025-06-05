@@ -1,6 +1,6 @@
-from fastapi import FastAPI, File, UploadFile, Form, Body
+from fastapi import FastAPI, File, UploadFile, Form, Body, Depends, HTTPException, Header, Request, Cookie
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, RedirectResponse
 import os
 import uuid
 import shutil
@@ -8,19 +8,41 @@ import subprocess
 from logger import logger
 from dotenv import load_dotenv
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 import asyncio
 import threading
-from typing import Optional
+from typing import Optional, Dict, Callable, Awaitable
 import queue
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from collections import deque
 import json
 import signal
 import psutil
+from fastapi.staticfiles import StaticFiles
+import platform
+import base64 # 用于演示目的的Key编码，不安全
+import re # 新增导入
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import Response as StarletteBaseResponse
+from starlette.responses import RedirectResponse as StarletteRedirectResponse
+from urllib.parse import urlencode # 新增导入
 
 load_dotenv()
 app = FastAPI()
+
+# 优雅关闭：定义应用关闭时执行的函数
+async def on_app_shutdown():
+    logger.info("FastAPI application (setting_api.py) is shutting down. Cleaning up services.")
+    cleanup_service() # 这个函数包含了停止 app.py 子进程的逻辑
+
+# 注册关闭事件处理程序
+app.add_event_handler("shutdown", on_app_shutdown)
+
+@app.on_event("startup")
+async def on_app_startup():
+    logger.info("FastAPI application (setting_api.py) is starting up. Initializing database.")
+    init_db()
 
 # 允许跨域
 app.add_middleware(
@@ -65,6 +87,111 @@ logger.info(f"COS_SECRET_KEY: {COS_SECRET_KEY}")
 logger.info(f"COS_REGION: {COS_REGION}")
 logger.info(f"COS_BUCKET: {COS_BUCKET}")
 
+# --- 授权机制开始 ---
+# 重要警告: 以下 Key 生成和解析逻辑仅为演示，使用 Base64 编码，极不安全。
+# 生产环境中必须替换为强加密算法 (例如 cryptography.fernet)。
+
+def get_machine_id() -> Optional[str]:
+    """获取机器唯一标识符"""
+    system = platform.system()
+    try:
+        if system == "Windows":
+            # 尝试使用 wmic 获取 UUID
+            result = subprocess.check_output(
+                ['wmic', 'csproduct', 'get', 'uuid'], 
+                universal_newlines=True, 
+                stderr=subprocess.DEVNULL
+            )
+            machine_id = result.split('\\n')[1].strip()
+            if machine_id:
+                return machine_id
+        elif system == "Linux":
+            # 尝试读取 /etc/machine-id 或 /var/lib/dbus/machine-id
+            for path in ["/etc/machine-id", "/var/lib/dbus/machine-id"]:
+                if os.path.exists(path):
+                    with open(path, "r") as f:
+                        machine_id = f.read().strip()
+                        if machine_id:
+                            return machine_id
+            # 备选：尝试获取第一个非本地回环MAC地址
+            for interface, snics in psutil.net_if_addrs().items():
+                for snic in snics:
+                    if snic.family == psutil.AF_LINK and snic.address and snic.address != "00:00:00:00:00:00":
+                        return snic.address.replace(":", "").replace("-", "").lower()
+        elif system == "Darwin": # macOS
+            result = subprocess.check_output(
+                ['ioreg', '-rd1', '-c', 'IOPlatformExpertDevice'], 
+                universal_newlines=True,
+                stderr=subprocess.DEVNULL
+            )
+            for line in result.split('\\n'):
+                if "IOPlatformUUID" in line:
+                    machine_id = line.split('"')[-2]
+                    if machine_id:
+                        return machine_id
+    except Exception as e:
+        logger.error(f"获取机器码失败 ({system}): {e}")
+    
+    logger.warning("无法确定唯一的机器ID，将尝试使用主机名作为备用（不推荐）。")
+    return platform.node() # 备用方案，唯一性较差
+
+def parse_license_key(license_key: str) -> Optional[Dict[str, any]]:
+    """
+    解析（"解密"）License Key。
+    当前实现使用 Base64，极不安全，仅为演示。
+    真实场景下，这里应该是对应 generate_license_key 中加密算法的解密过程。
+    """
+    try:
+        # 假设 Key 格式为: base64(machine_id|expiry_date_isoformat)
+        decoded_payload = base64.urlsafe_b64decode(license_key.encode()).decode()
+        parts = decoded_payload.split('|')
+        if len(parts) == 2:
+            machine_id = parts[0]
+            expiry_date_str = parts[1]
+            return {
+                "machine_id": machine_id,
+                "expiry_date": datetime.fromisoformat(expiry_date_str)
+            }
+        else:
+            logger.warning(f"License Key 格式错误 (parts): {license_key}")
+            return None
+    except Exception as e:
+        logger.error(f"解析 License Key 失败 '{license_key}': {e}")
+        return None
+
+async def verify_license_dependency(
+    x_license_key_header: Optional[str] = Header(None, alias="X-License-Key"),
+    x_license_key_cookie: Optional[str] = Cookie(None, alias="X-License-Key-Cookie")
+):
+    license_key_to_check = x_license_key_header
+    source = "Header"
+
+    if not license_key_to_check and x_license_key_cookie:
+        license_key_to_check = x_license_key_cookie
+        source = "Cookie"
+    
+    if not license_key_to_check:
+        logger.warning("【API授权依赖】请求头和 Cookie 中均未找到授权码。")
+        raise HTTPException(status_code=401, detail="授权失败: 未提供 License Key (Error: KEY_REQUIRED_ANYWHERE)")
+
+    logger.info(f"【API授权依赖】使用 {source} 中的授权码进行验证。")
+    try:
+        validated_data = await validate_license_key_logic(license_key_to_check)
+        return {
+            "machine_id": validated_data["machine_id"], 
+            "expires_at": validated_data["expiry_date"], 
+            "license_key_used": license_key_to_check,
+            "auth_source": source
+        }
+    except HTTPException as e:
+        # 如果是通过Cookie授权失败，可能需要清除无效的Cookie
+        # 但依赖项通常不直接操作响应。中间件更适合处理。
+        # 这里仅重新抛出异常，让中间件或全局异常处理器决定。
+        logger.warning(f"【API授权依赖】验证失败 ({source}): {e.detail}")
+        raise e
+
+# --- 授权机制结束 ---
+
 # 使用 deque 存储最近的100条日志
 MAX_LOGS = 100
 service_logs = deque(maxlen=MAX_LOGS)
@@ -72,10 +199,20 @@ service_process = None
 log_thread = None
 service_port = 6006
 
+# --- Pydantic 模型 ---
 class ServiceConfig(BaseModel):
     voice_id: str
     avatar_id: str
     extra_params: str = ""
+
+class RoleConfigPayload(BaseModel): # 修改模型
+    role_name: str = Field(..., alias='roleName')
+    preset_prompt: str = Field(..., alias='presetPrompt')
+    script_library_text: str = Field(..., alias='scriptLibraryText')
+
+    class Config:
+        populate_by_name = True # 允许通过别名填充模型字段，以及原始字段名
+        # orm_mode = True # 如果是从ORM对象创建模型实例，则需要，这里不需要
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -102,6 +239,16 @@ def init_db():
             created_at TEXT
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS role_configurations (
+            id INTEGER PRIMARY KEY,
+            role_name TEXT,
+            preset_prompt TEXT,
+            script_library_text TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -111,6 +258,7 @@ def reinit_db():
     c = conn.cursor()
     c.execute("DROP TABLE IF EXISTS voices")
     c.execute("DROP TABLE IF EXISTS avatars")
+    c.execute("DROP TABLE IF EXISTS role_configurations")
     conn.commit()
     conn.close()
     init_db()
@@ -118,12 +266,217 @@ def reinit_db():
 # 如果需要重新初始化数据库，取消下面这行的注释
 # reinit_db()
 
+# 挂载 static 目录以便访问 web 下的文件
+app.mount("/web", StaticFiles(directory=os.path.join(BASE_DIR, "web")), name="web")
+
+# --- 新的授权页面和逻辑 ---
+
+ERROR_MESSAGES_MAP = {
+    "SYS_KEY_MISSING": "系统授权服务未配置，请联系管理员。",
+    "KEY_MISMATCH": "提供的授权码无效。",
+    "SYS_KEY_PARSE_FAIL": "系统授权信息格式错误，请联系管理员。",
+    "MID_FAIL": "无法获取设备信息以验证授权，请联系管理员。",
+    "MID_MISMATCH": "授权码与当前设备不匹配。",
+    "KEY_EXPIRED": "授权码已过期。",
+    "KEY_REQUIRED": "请输入授权码。",
+    "COOKIE_VALIDATION_FAILED": "当前授权凭证无效或已过期，请重新授权。",
+    "SESSION_EXPIRED_OR_INVALIDATED": "您的会话已过期或授权已失效，请重新登录。",
+    "UNKNOWN_ERROR": "发生未知错误，请重试或联系管理员。"
+}
+
+AUTH_PAGE_HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang=\"zh-CN\">
+<head>
+    <meta charset=\"UTF-8\">
+    <title>请授权 - LiveTalking 服务</title>
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #f0f2f5; }}
+        .container {{ background: white; padding: 30px 40px; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 420px; }}
+        h2 {{ margin-top:0; color: #333; font-size: 24px; margin-bottom: 15px;}}
+        p {{ color: #555; margin-bottom: 25px; font-size: 16px; line-height: 1.6;}}
+        input[type=\"text\"] {{ padding: 14px; margin-bottom: 25px; width: calc(100% - 30px); border: 1px solid #d9d9d9; border-radius: 6px; font-size: 16px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.075); }}
+        input[type=\"text\"]:focus {{ border-color: #409EFF; box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2); outline: none; }}
+        button {{ padding: 14px 28px; background-color: #409EFF; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 500; transition: background-color 0.2s ease-in-out; width: 100%; }}
+        button:hover {{ background-color: #66b1ff; }}
+        .error-message {{ background-color: #fef0f0; color: #f56c6c; border: 1px solid #fde2e2; padding: 12px 15px; border-radius: 6px; margin-bottom: 20px; text-align: left; font-size: 14px; }}
+        .app-title {{ font-weight: 600; color: #409EFF;}}
+    </style>
+</head>
+<body>
+    <div class=\"container\">
+        <h2>欢迎使用 <span class=\"app-title\">LiveTalking</span></h2>
+        {{error_html}}
+        <p>为确保服务安全，请输入您的授权码以继续访问。</p>
+        <form method=\"POST\" action=\"/submit_license_key_from_auth_page\">
+            <input type=\"text\" name=\"license_key\" placeholder=\"授权码\" required value=\"{{license_key_value}}\">
+            <br>
+            <button type=\"submit\">验证并访问</button>
+        </form>
+    </div>
+</body>
+</html>
+"""
+
+async def validate_license_key_logic(license_key: Optional[str]):
+    system_license_key_env = os.getenv("SYSTEM_LICENSE_KEY")
+    logger.info(f"SYSTEM_LICENSE_KEY: {system_license_key_env}")
+    if not system_license_key_env:
+        logger.error("【授权验证】SYSTEM_LICENSE_KEY 环境变量未设置。")
+        raise HTTPException(status_code=503, detail="授权服务未配置或不可用 (Error: SYS_KEY_MISSING)")
+
+    if not license_key:
+        logger.warning("【授权验证】未提供 License Key。")
+        raise HTTPException(status_code=401, detail="授权失败: 未提供 License Key (Error: KEY_REQUIRED)")
+
+    if license_key != system_license_key_env:
+        logger.warning(f"【授权验证】提供的 License Key 与系统配置不匹配。")
+        raise HTTPException(status_code=403, detail="授权失败: License Key 无效 (Error: KEY_MISMATCH)")
+
+    parsed_key_data = parse_license_key(license_key)
+    if not parsed_key_data:
+        logger.error(f"【授权验证】系统配置的 License Key 格式似乎有误 (解析失败): {license_key}")
+        raise HTTPException(status_code=500, detail="授权系统内部错误: 系统 Key 解析失败 (Error: SYS_KEY_PARSE_FAIL)")
+
+    key_machine_id = parsed_key_data["machine_id"]
+    expiry_date = parsed_key_data["expiry_date"]
+    current_machine_id = get_machine_id()
+
+    if not current_machine_id:
+        logger.error("【授权验证】无法确定当前机器的机器码用于验证。")
+        raise HTTPException(status_code=500, detail="授权系统内部错误: 无法获取机器码 (Error: MID_FAIL)")
+
+    if key_machine_id != current_machine_id:
+        logger.warning(f"【授权验证】License Key 中的机器码 ({key_machine_id}) 与当前机器 ({current_machine_id}) 不匹配。")
+        raise HTTPException(status_code=403, detail=f"授权失败: License Key 与当前设备不匹配 (Error: MID_MISMATCH)")
+
+    if datetime.now() > expiry_date:
+        logger.warning(f"【授权验证】License Key 已于 {expiry_date.isoformat()} 过期。")
+        raise HTTPException(status_code=403, detail=f"授权失败: License Key 已过期 (Expired on: {expiry_date.date()}) (Error: KEY_EXPIRED)")
+    
+    logger.info(f"授权检查通过 (通用逻辑): 机器码 {current_machine_id}, Key 有效期至 {expiry_date.isoformat()}.")
+    return parsed_key_data
+
+@app.get("/auth_page", response_class=HTMLResponse)
+async def get_auth_page(
+    error_code: Optional[str] = None,
+    license_key_value: Optional[str] = "" # For pre-filling if needed, though generally not for security
+):
+    err_html_content = ""
+    if error_code:
+        error_message_text = ERROR_MESSAGES_MAP.get(error_code, ERROR_MESSAGES_MAP["UNKNOWN_ERROR"])
+        err_html_content = f"<div class='error-message'>{error_message_text}</div>"
+    
+    return AUTH_PAGE_HTML_TEMPLATE.format(error_html=err_html_content, license_key_value=license_key_value)
+
+@app.post("/submit_license_key_from_auth_page")
+async def handle_license_key_submission(license_key: str = Form(...)):
+    try:
+        await validate_license_key_logic(license_key)
+        # 授权成功
+        response = RedirectResponse(url="/web/setting.html", status_code=303)
+        # Cookie 有效期 30 天
+        response.set_cookie(key="X-License-Key-Cookie", value=license_key, httponly=True, samesite="Lax", max_age=30*24*60*60, path="/")
+        logger.info(f"授权码提交成功，设置授权 Cookie。")
+        return response
+    except HTTPException as e:
+        error_code = "UNKNOWN_ERROR"
+        match = re.search(r"\(Error:\s*([A-Z_]+)\)", e.detail)
+        if match:
+            error_code = match.group(1)
+        logger.warning(f"授权码提交失败: {e.detail} (Code: {error_code})")
+        # 重定向回授权页面并携带错误代码和用户尝试过的key（可选）
+        # 安全起见，不在URL中传递用户尝试过的key。
+        redirect_url = f"/auth_page?error_code={error_code}"
+        return RedirectResponse(url=redirect_url, status_code=303)
+
+@app.get("/logout_and_reauth")
+async def logout_and_reauth_endpoint():
+    response = RedirectResponse(url="/auth_page?reauth=true", status_code=303)
+    response.delete_cookie("X-License-Key-Cookie", path="/")
+    logger.info("用户请求重新授权，清除授权 Cookie。")
+    return response
+
+# --- 认证中间件 ---
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next: Callable[[StarletteRequest], Awaitable[StarletteBaseResponse]]):
+        # 豁免路径
+        exempt_paths = ["/auth_page", "/submit_license_key_from_auth_page", "/logout_and_reauth", "/favicon.ico"]
+        if any(request.url.path.startswith(p) for p in exempt_paths):
+            return await call_next(request)
+        
+        # API 路径（通常包含 /upload_, /list_, /delete_, /update_, /start_, /stop_, /service_, /avatar_status）
+        # 由 verify_license_dependency 保护，中间件不直接处理它们的授权逻辑，但可以检查系统配置。
+        api_path_patterns = ["/upload_", "/list_", "/delete_", "/update_", "/start_", "/stop_", "/service_", "/avatar_status"]
+        is_api_call = any(pattern in request.url.path for pattern in api_path_patterns)
+
+        # 系统级检查: SYSTEM_LICENSE_KEY 是否设置
+        system_license_key_env = os.getenv("SYSTEM_LICENSE_KEY")
+        if not system_license_key_env:
+            logger.error(f"AuthMiddleware: SYSTEM_LICENSE_KEY 环境变量未设置。 Path: {request.url.path}")
+            # API 调用会让其依赖项处理。页面请求在这里处理。
+            if not is_api_call:
+                 return HTMLResponse(content="<h1>服务配置错误 (SYS_KEY_MISSING)</h1><p>请联系管理员。系统授权未配置。</p>", status_code=503)
+            # 对于API调用，允许其继续，由 verify_license_dependency 抛出错误
+            return await call_next(request)
+
+        # 页面路径授权检查 (/, /web/*)
+        if request.url.path == "/" or request.url.path.startswith("/web"):
+            license_key_cookie = request.cookies.get("X-License-Key-Cookie")
+            is_authorized_for_page = False
+            auth_error_code_for_redirect = None
+
+            if license_key_cookie:
+                try:
+                    await validate_license_key_logic(license_key_cookie)
+                    is_authorized_for_page = True
+                    logger.info(f"AuthMiddleware: Cookie 授权成功 for page: {request.url.path}")
+                except HTTPException as e:
+                    match = re.search(r"\(Error:\s*([A-Z_]+)\)", e.detail)
+                    if match: auth_error_code_for_redirect = match.group(1)
+                    else: auth_error_code_for_redirect = "COOKIE_VALIDATION_FAILED"
+                    logger.warning(f"AuthMiddleware: Cookie 授权失败 for page {request.url.path} - {e.detail}. Code: {auth_error_code_for_redirect}")
+            else:
+                logger.info(f"AuthMiddleware: 未找到授权 Cookie for page: {request.url.path}")
+                auth_error_code_for_redirect = "KEY_REQUIRED" # No cookie means key is required
+
+            if not is_authorized_for_page:
+                redirect_url = f"/auth_page"
+                if auth_error_code_for_redirect:
+                    redirect_url += f"?error_code={auth_error_code_for_redirect}"
+                
+                response = StarletteRedirectResponse(url=redirect_url, status_code=307)
+                if license_key_cookie: # 如果存在无效/过期的cookie，清除它
+                    logger.info(f"AuthMiddleware: 清除无效的授权 Cookie for page {request.url.path}")
+                    response.delete_cookie("X-License-Key-Cookie", path="/")
+                return response
+            
+            # 如果授权成功且访问根路径，重定向到主面板
+            if request.url.path == "/" and is_authorized_for_page:
+                logger.info("AuthMiddleware: 已授权访问根路径, 重定向到 /web/setting.html")
+                return StarletteRedirectResponse(url="/web/setting.html", status_code=303)
+
+        # 其他所有请求（包括已授权的页面请求和API请求）
+        return await call_next(request)
+
+# 在CORS之后，路由之前添加中间件
+app.add_middleware(AuthMiddleware)
+
+
 @app.get("/")
-async def root():
-    return FileResponse("web/setting.html")
+async def root_redirect_handler():
+    # 此路由理论上会被中间件处理。
+    # 如果中间件逻辑有遗漏，或作为备用，可以保留一个简单的重定向。
+    # 但中间件应该完全覆盖 / 的场景。
+    # 为清晰起见，可以移除，或留一个最简形式。
+    # 如果中间件正确工作，此路由不会在正常流程中被直接调用。
+    # 暂时注释掉，如果发现问题再考虑恢复。
+    # return RedirectResponse(url="/web/setting.html") # Or let middleware handle
+    pass
 
 
-@app.post("/upload_voice")
+@app.post("/upload_voice", dependencies=[Depends(verify_license_dependency)])
 async def upload_voice(
     file: UploadFile = File(...),
     prefix: str = Form("custom_voice"),
@@ -289,7 +642,7 @@ def process_avatar_generation(avatar_id: str, temp_video_path: str):
     finally:
         conn.close()
 
-@app.post("/upload_avatar")
+@app.post("/upload_avatar", dependencies=[Depends(verify_license_dependency)])
 async def upload_avatar(
     file: UploadFile = File(...),
     name: str = Form(...)
@@ -453,7 +806,7 @@ def list_avatars():
             content={"status": "error", "message": f"获取数字人列表失败: {str(e)}"}
         )
 
-@app.delete("/delete_voice/{voice_id}")
+@app.delete("/delete_voice/{voice_id}", dependencies=[Depends(verify_license_dependency)])
 def delete_voice(voice_id: str):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -462,7 +815,7 @@ def delete_voice(voice_id: str):
     conn.close()
     return {"status": "success"}
 
-@app.delete("/delete_avatar/{avatar_id}")
+@app.delete("/delete_avatar/{avatar_id}", dependencies=[Depends(verify_license_dependency)])
 def delete_avatar(avatar_id: str):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -471,7 +824,7 @@ def delete_avatar(avatar_id: str):
     conn.close()
     return {"status": "success"}
 
-@app.post("/update_voice")
+@app.post("/update_voice", dependencies=[Depends(verify_license_dependency)])
 def update_voice(id: int = Form(...), prefix: str = Form(...)):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -480,7 +833,7 @@ def update_voice(id: int = Form(...), prefix: str = Form(...)):
     conn.close()
     return {"status": "success"}
 
-@app.post("/update_avatar")
+@app.post("/update_avatar", dependencies=[Depends(verify_license_dependency)])
 def update_avatar(
     id: int = Form(...),
     name: Optional[str] = Form(default=...),
@@ -558,6 +911,7 @@ def log_reader(process, log_queue):
                 'type': 'info'  # 可以根据输出内容判断类型
             }
             log_queue.append(log_entry)
+            logger.info(f"[Service Process]: {output.strip()}")
     
     # 添加进程结束的日志
     if process.poll() is not None:
@@ -624,7 +978,7 @@ def cleanup_service():
         logger.error(f"Error in cleanup_service: {str(e)}")
         return False
 
-@app.post("/start_service")
+@app.post("/start_service", dependencies=[Depends(verify_license_dependency)])
 def start_service(config: ServiceConfig):
     global service_process, log_thread
     try:
@@ -695,7 +1049,7 @@ def start_service(config: ServiceConfig):
             "message": f"启动服务失败: {error_msg}"
         })
 
-@app.post("/stop_service")
+@app.post("/stop_service", dependencies=[Depends(verify_license_dependency)])
 def stop_service():
     try:
         if service_process is None:
@@ -751,6 +1105,84 @@ def get_service_logs():
         "logs": list(service_logs)  # 转换 deque 为列表
     })
 
+# --- 角色配置 API ---
+@app.post("/save_role_config", dependencies=[Depends(verify_license_dependency)])
+async def save_role_config(payload: RoleConfigPayload):
+    conn = None  # Initialize conn to None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        now = datetime.now().isoformat()
+        
+        # 使用 INSERT OR REPLACE (UPSERT) 逻辑，因为我们总是操作 id=1 的记录
+        sql = """
+            INSERT OR REPLACE INTO role_configurations (id, role_name, preset_prompt, script_library_text, created_at, updated_at)
+            VALUES (
+                1, ?, ?, ?,
+                COALESCE((SELECT created_at FROM role_configurations WHERE id = 1), ?),
+                ?
+            )
+        """
+        params = (payload.role_name, payload.preset_prompt, payload.script_library_text, now, now)
+        c.execute(sql, params)
+        
+        conn.commit()
+        logger.info(f"角色配置已保存/更新: {payload.role_name}")
+        return {"status": "success", "message": "角色配置已成功保存！"}
+    except Exception as e:
+        logger.error(f"保存角色配置失败: {str(e)}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": f"保存角色配置失败: {str(e)}"})
+    finally:
+        if conn:
+            conn.close()
+
+@app.get("/get_role_config", dependencies=[Depends(verify_license_dependency)])
+async def get_role_config_api():
+    conn = None  # Initialize conn to None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT role_name, preset_prompt, script_library_text, updated_at FROM role_configurations WHERE id = 1")
+        row = c.fetchone()
+        
+        if row:
+            return {
+                "status": "success",
+                "data": {
+                    "role_name": row[0],
+                    "preset_prompt": row[1],
+                    "script_library_text": row[2],
+                    "updated_at": row[3]
+                }
+            }
+        else:
+            return {
+                "status": "success",
+                "data": {
+                    "role_name": "",
+                    "preset_prompt": "",
+                    "script_library_text": "",
+                    "updated_at": None
+                }
+            }
+    except Exception as e:
+        logger.error(f"获取角色配置失败: {str(e)}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": f"获取角色配置失败: {str(e)}"})
+    finally:
+        if conn:
+            conn.close()
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("setting_api:app", host="0.0.0.0", port=8001, reload=True) 
+    import sys # 新增导入 sys
+    
+    # 检查是否在 PyInstaller 打包的环境中运行
+    is_frozen = getattr(sys, 'frozen', False)
+    
+    if is_frozen:
+        # 在打包环境中，禁用 reload，并直接传递 app 对象
+        uvicorn.run(app, host="0.0.0.0", port=8001, reload=False, workers=1) # 明确指定 workers=1
+    else:
+        # 在开发环境中，使用字符串形式以便 uv run 正确处理 reload
+        # 或者直接 python setting_api.py 也能 reload
+        uvicorn.run("setting_api:app", host="0.0.0.0", port=8001, reload=True) 

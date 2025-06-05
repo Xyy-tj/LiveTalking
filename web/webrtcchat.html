@@ -3,62 +3,203 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebRTC webcam</title>
+    <title>WebRTC 聊天演示</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <style>
-    button {
-        padding: 8px 16px;
+    body {
+        background-color: #f8f9fa;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh; /* 确保body至少和视口一样高 */
     }
-
-    video {
+    .container-fluid {
+        flex: 1; /* 让容器填充剩余空间 */
+        display: flex;
+        flex-direction: column;
+        padding-top: 1rem; /* 顶部留出一些空间 */
+        padding-bottom: 1rem; /* 底部留出一些空间 */
+    }
+    .card-header {
+        background-color: #e9ecef;
+        font-weight: bold;
+    }
+    .chat-textarea {
+        resize: none; /* 禁止用户调整文本框大小 */
+    }
+    #media_container {
+        flex: 1; /* 媒体容器填充可用垂直空间 */
+        display: flex;
+        flex-direction: column;
+        min-height: 0; /* 移除最小高度限制，允许完全基于父级或iframe */
+        height: 100%; /* 让媒体容器尝试填充父级（比如iframe）的高度 */
+        border: none; /* 如果有边框，移除 */
+        padding: 0; /* 移除内边距 */
+    }
+    #media_container .card-header {
+        display: none; /* 隐藏媒体流的头部，使其不占用空间 */
+    }
+    #media_container .card-body {
+        flex: 1;
+        display: flex;
+        /* align-items: center; */ /* 移除以允许视频从左上角开始填充 */
+        /* justify-content: center; */ /* 移除以允许视频从左上角开始填充 */
+        overflow: hidden; /* 防止视频溢出 */
+        padding: 0; /* 移除内边距 */
+        height: 100%;
         width: 100%;
     }
-
-    .option {
-        margin-bottom: 8px;
+    #media { /* 新增或修改 #media 容器的样式 */
+        width: 100%;
+        height: 100%;
+        display: flex; /* 使内部 video 也能更好地控制 */
     }
-
-    #media {
-        max-width: 1280px;
+    #media video {
+        width: 100%;
+        height: 100%; /* 高度占满容器 */
+        /* max-width: 100%; */ /* 已被 width: 100% 覆盖 */
+        /* max-height: 80vh; */ /* 移除最大高度限制 */
+        border-radius: 0; /* 移除圆角，使其看起来更像全屏 */
+        object-fit: cover; /* 保持宽高比，裁剪以填充空间 */
+        /* object-fit: contain; */ /* (原)保持宽高比，完整显示视频内容 */
+    }
+    .control-panel .btn {
+        margin-bottom: 0.5rem; /* 按钮间距 */
+    }
+    .control-panel .option {
+        padding: 0.5rem;
+        border: 1px solid #ddd;
+        border-radius: .25rem;
+        background-color: #fff;
+    }
+    .main-row {
+        flex: 1; /* 让包含主要内容和控制面板的行填充空间 */
+    }
+    .main-content-col {
+        display: flex;
+        flex-direction: column;
+        flex: 1; /* 新增：确保此列在 main-row 中能分配空间 */
+        min-height: 0; /* 与 flex:1 配合使用，防止内容溢出问题 */
+    }
+    .js-toggleable-control-area.controls-hidden { /* Target the new class */
+        display: none !important;
+    }
+    #toggleControlsBtn {
+        position: fixed; /* Use fixed to keep it on screen even if parent scrolls */
+        top: 10px;
+        right: 10px;
+        z-index: 2000; /* Ensure it's above other elements */
+        padding: 5px 10px;
     }
     </style>
 </head>
 <body>
+<button id="toggleControlsBtn" class="btn btn-sm btn-outline-secondary">Toggle Controls</button>
 
-<div class="option">
-    <input id="use-stun" type="checkbox"/>
-    <label for="use-stun">Use STUN server</label>
-</div>
-<div class="option">
-    <label>当前音色ID: </label>
-    <span id="current-voice-id">loading...</span>
-    <button onclick="refreshVoiceId()">刷新</button>
-</div>
-<button id="start" onclick="start()">Start</button>
-<button id="stop" style="display: none" onclick="stop()">Stop</button>
-<button class="btn btn-primary" id="btn_start_record">Start Recording</button>
-<button class="btn btn-primary" id="btn_stop_record" disabled>Stop Recording</button>
-<!-- <button class="btn btn-primary" id="btn_download">Download Video</button> -->
-<input type="hidden" id="sessionid" value="0">
-<form class="form-inline" id="echo-form">
-    <div class="form-group">
-      <p>input text</p>
+<div class="container-fluid mt-4 mb-4">
+    <h1 class="text-center mb-4">WebRTC 实时互动</h1>
+    <div class="row main-row">
+        <div class="col-lg-8 main-content-col">
+            <!-- 媒体播放区 -->
+            <div class="card mb-3" id="media_container">
+                <div class="card-header">
+                    媒体流
+                    <div id="rtc-stability-warning" class="alert alert-info alert-dismissible fade show mt-2" role="alert" style="display: none; font-size: 0.85rem; padding: 0.5rem 1rem;">
+                        <strong>提示:</strong> 服务刚启动时（约1分钟内），RTC服务会自适应传输码率，可能存在短暂画面模糊，随后将逐渐稳定并显著好转。
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close" style="padding: 0.5rem 1rem;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body text-center">
+                    <div id="media">
+                        <video id="video" class="w-100 border bg-light" autoplay="true" playsinline="true" controls></video>
+                        <audio id="audio" autoplay="true" class="mt-2" style="display: none;"></audio> <!-- 隐藏audio元素，如果不需要显示的话 -->
+                    </div>
+                </div>
+            </div>
 
-      <textarea cols="2" rows="3" style="width:600px;height:50px;" class="form-control" id="message">test</textarea>
+            <!-- 对话功能与话术控制合并区 -->
+            <div class="card mb-3 js-toggleable-control-area">
+                <div class="card-header">
+                    互动与控制
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>对话交流 (Chat)</h5>
+                            <form id="echo-form">
+                                <div class="form-group">
+                                    <label for="message">输入文本:</label>
+                                    <textarea rows="3" class="form-control chat-textarea" id="message" placeholder="请输入聊天内容">测试文本</textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">发送</button>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>数字人话术控制 (Echo)</h5>
+                            <form id="digital-human-form">
+                                <div class="form-group">
+                                    <label for="digital-message">输入话术:</label>
+                                    <textarea rows="3" class="form-control chat-textarea" id="digital-message" placeholder="请输入数字人要直接输出的话术"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-success btn-block">直接输出</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 control-panel js-toggleable-control-area">
+            <!-- STUN 服务器选项 -->
+            <div class="card mb-3">
+                <div class="card-header">设置</div>
+                <div class="card-body">
+                    <div class="option mb-2">
+                        <div class="form-check">
+                            <input id="use-stun" type="checkbox" class="form-check-input"/>
+                            <label for="use-stun" class="form-check-label">使用 STUN 服务器</label>
+                        </div>
+                    </div>
+                    <div class="option">
+                        <label>当前音色ID: </label>
+                        <span id="current-voice-id" class="badge badge-info">loading...</span>
+                        <button class="btn btn-sm btn-outline-secondary float-right" onclick="refreshVoiceId()">刷新</button>
+                    </div>
+                    <div class="option mt-2">
+                        <label>视频分辨率: </label>
+                        <span id="video-resolution" class="badge badge-secondary">- x -</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 主要控制按钮 -->
+            <div class="card mb-3">
+                <div class="card-header">主控制</div>
+                <div class="card-body">
+                    <button id="start" class="btn btn-success btn-block" onclick="showRtcWarningAndStart()">开始连接</button>
+                    <button id="stop" class="btn btn-danger btn-block" style="display: none" onclick="stop()">断开连接</button>
+                </div>
+            </div>
+
+            <!-- 录制控制按钮 -->
+            <div class="card">
+                <div class="card-header">录制功能</div>
+                <div class="card-body">
+                    <button class="btn btn-info btn-block" id="btn_start_record">开始录制</button>
+                    <button class="btn btn-warning btn-block" id="btn_stop_record" disabled>停止录制</button>
+                </div>
+            </div>
+        </div>
     </div>
-    <button type="submit" class="btn btn-default">Send</button>
-  </form>
-
-<div id="media">
-    <h2>Media</h2>
-
-    <audio id="audio" autoplay="true"></audio>
-    <video id="video" style="width:600px;" autoplay="true" playsinline="true"></video>
+    <input type="hidden" id="sessionid" value="0">
 </div>
 
 <script src="client.js"></script>
-<!-- <script type="text/javascript" src="http://cdn.sockjs.org/sockjs-0.3.4.js"></script> -->
 <script type="text/javascript" src="https://cdn.jsdelivr.net/sockjs/0.3/sockjs.min.js"></script>
 <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 <script type="text/javascript" charset="utf-8">
     async function refreshVoiceId() {
@@ -78,6 +219,50 @@
 
     // 页面加载时获取音色ID
     document.addEventListener('DOMContentLoaded', refreshVoiceId);
+
+    let rtcWarningTimeout = null;
+
+    // 获取 video 元素
+    const videoElement = document.getElementById('video');
+
+    // 更新视频分辨率显示的函数
+    function updateVideoResolution() {
+        const resolutionSpan = document.getElementById('video-resolution');
+        if (videoElement.videoWidth && videoElement.videoHeight) {
+            resolutionSpan.textContent = `${videoElement.videoWidth} x ${videoElement.videoHeight}`;
+        } else {
+            resolutionSpan.textContent = "- x -";
+        }
+    }
+
+    // 当视频元数据加载完成或视频开始播放时，更新分辨率
+    videoElement.onloadedmetadata = updateVideoResolution;
+    videoElement.onplaying = updateVideoResolution;
+    // 有些浏览器可能在尺寸改变时触发resize，但更可靠的是轮询或监听特定事件
+    // 为确保动态变化也能捕获，可以考虑在onplaying后设置一个定时器轮询，但需注意性能
+    // videoElement.onresize = updateVideoResolution; // onresize 对 video 元素不一定总是触发
+
+    function showRtcWarningAndStart() {
+        const warningDiv = document.getElementById('rtc-stability-warning');
+        warningDiv.style.display = 'block';
+
+        // 清除可能存在的旧的timeout
+        if (rtcWarningTimeout) {
+            clearTimeout(rtcWarningTimeout);
+        }
+
+        // 20秒后自动隐藏提示，您可以调整这个时间
+        rtcWarningTimeout = setTimeout(() => {
+            $(warningDiv).alert('close'); // 使用Bootstrap的alert关闭方法，会有淡出效果
+        }, 20000); 
+
+        // 调用原来的 start() 函数 (假设它在 client.js 或全局作用域中)
+        if (typeof start === 'function') {
+            start();
+        } else {
+            console.error('start() function is not defined. Make sure client.js is loaded and start() is global or properly scoped.');
+        }
+    }
 
 	$(document).ready(function() {
 	  // var host = window.location.hostname
@@ -115,9 +300,27 @@
             },
             method: 'POST'
       });
-      //ws.send(message);
       $('#message').val('');
 	  });
+
+    $('#digital-human-form').on('submit', function(e) {
+      e.preventDefault();
+      var message = $('#digital-message').val();
+      console.log('Sending digital message: ' + message);
+      fetch('/human', {
+            body: JSON.stringify({
+                text: message,
+                type: 'echo',
+                interrupt: true,
+                sessionid:parseInt(document.getElementById('sessionid').value),
+            }),
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            method: 'POST'
+      });
+      $('#digital-message').val('');
+    });
 
     $('#btn_start_record').click(function() {
         // 开始录制
@@ -200,8 +403,174 @@
     //     });
     // });
 
+      // Listen for messages from parent window (setting.html)
+      window.addEventListener('message', function(event) {
+          // IMPORTANT: Always verify the origin of the message!
+          if (event.origin !== 'http://localhost:8001') { // Expected origin of setting.html
+              // console.log('[webrtcchat.html] Discarding message from unexpected origin:', event.origin);
+              return;
+          }
+
+          const data = event.data;
+          // console.log('[webrtcchat.html] Received command from parent:', data);
+
+          if (data && data.type === 'sendDigitalHumanEcho') {
+              const messageText = data.text;
+              const sessionId = data.sessionId; // Use the sessionId from the command
+
+              if (messageText && sessionId) {
+                  console.log(`[webrtcchat.html] Executing 'echo' command from parent. Session ID: ${sessionId}, Text: ${messageText}`);
+                  fetch('/human', {
+                      body: JSON.stringify({
+                          text: messageText,
+                          type: 'echo',
+                          interrupt: true, // Or make this configurable if needed
+                          sessionid: parseInt(sessionId),
+                      }),
+                      headers: {
+                          'Content-Type': 'application/json'
+                      },
+                      method: 'POST'
+                  }).then(response => {
+                      if (!response.ok) {
+                          console.error('[webrtcchat.html] Failed to send digital human echo via parent command. Status:', response.status);
+                      } else {
+                          console.log('[webrtcchat.html] Digital human echo command sent successfully.');
+                      }
+                  }).catch(error => {
+                      console.error('[webrtcchat.html] Error sending digital human echo command:', error);
+                  });
+              } else {
+                  console.warn('[webrtcchat.html] Received sendDigitalHumanEcho command but text or sessionId is missing.', data);
+              }
+          } else if (data && data.type === 'toggleStun') {
+              const useStunCheckbox = document.getElementById('use-stun');
+              if (useStunCheckbox) {
+                  useStunCheckbox.checked = data.useStun;
+                  console.log(`[webrtcchat.html] STUN server usage set to: ${data.useStun}`);
+              }
+          } else if (data && data.type === 'startConnection') {
+              console.log('[webrtcchat.html] Received startConnection command from parent.');
+              if (typeof showRtcWarningAndStart === 'function') {
+                  showRtcWarningAndStart();
+              } else if (typeof start === 'function') {
+                  start(); // Fallback if showRtcWarningAndStart is not global
+              } else {
+                  console.error('[webrtcchat.html] start function not found.');
+              }
+          } else if (data && data.type === 'stopConnection') {
+              console.log('[webrtcchat.html] Received stopConnection command from parent.');
+              if (typeof stop === 'function') {
+                  stop();
+              } else {
+                  console.error('[webrtcchat.html] stop function not found.');
+              }
+          } else if (data && data.type === 'sendChatMessage') {
+              const messageText = data.text;
+              const currentSessionId = document.getElementById('sessionid').value;
+              if (messageText && currentSessionId && currentSessionId !== '0') {
+                  console.log(`[webrtcchat.html] Executing 'chat' command from parent. Session ID: ${currentSessionId}, Text: ${messageText}`);
+                  fetch('/human', {
+                      body: JSON.stringify({
+                          text: messageText,
+                          type: 'chat',
+                          interrupt: true,
+                          sessionid: parseInt(currentSessionId),
+                      }),
+                      headers: { 'Content-Type': 'application/json' },
+                      method: 'POST'
+                  });
+                  // Optionally clear a corresponding text area in setting.html via another postMessage if needed
+              } else {
+                  console.warn('[webrtcchat.html] Received sendChatMessage command but text or session ID is invalid/missing.', {text: messageText, sessionId: currentSessionId});
+              }
+          } else if (data && data.type === 'startRecord') {
+              console.log('[webrtcchat.html] Received startRecord command from parent.');
+              $('#btn_start_record').click();
+          } else if (data && data.type === 'stopRecord') {
+              console.log('[webrtcchat.html] Received stopRecord command from parent.');
+              $('#btn_stop_record').click();
+          } else if (data && data.type === 'setControlsVisibility') {
+            // Get all elements that should be toggled
+            const controlsToToggle = document.querySelectorAll('.js-toggleable-control-area');
+            if (controlsToToggle.length > 0) {
+                controlsToToggle.forEach(controlArea => {
+                    if (data.visible) {
+                        controlArea.classList.remove('controls-hidden');
+                    } else {
+                        controlArea.classList.add('controls-hidden');
+                    }
+                });
+                console.log(`[webrtcchat.html] Controls visibility set to: ${data.visible}`);
+            }
+          }
+
+      });
+
 	});
 
-  
+    document.addEventListener('DOMContentLoaded', () => {
+        const toggleBtn = document.getElementById('toggleControlsBtn');
+        // Get all elements that should be toggled
+        const controlsToToggle = document.querySelectorAll('.js-toggleable-control-area');
+
+        if (toggleBtn && controlsToToggle.length > 0) {
+            toggleBtn.addEventListener('click', () => {
+                controlsToToggle.forEach(controlArea => {
+                    controlArea.classList.toggle('controls-hidden');
+                });
+            });
+        } else {
+            console.error('Toggle button or control areas not found.');
+        }
+
+        const sessionIdInput = document.getElementById('sessionid');
+        if (!sessionIdInput) {
+            console.error('[webrtcchat.html] 未找到 Session ID 输入字段。');
+            return;
+        }
+
+        const sendSessionIdToParent = (sessionId) => {
+            if (window.self !== window.top) { // 检查是否在 iframe 中
+                const parentOrigin = 'http://localhost:8001'; // setting.html 的源
+                console.log(`[webrtcchat.html] Session ID 为: ${sessionId}。正在发送到父窗口 ${parentOrigin}。`);
+                window.parent.postMessage({ type: 'webrtcSessionId', sessionId: sessionId }, parentOrigin);
+            } else {
+                // console.log('[webrtcchat.html] Session ID 已更改，但不在 iframe 中。');
+            }
+        };
+
+        // 初始检查，以防 client.js 在观察者附加之前设置了值
+        if (sessionIdInput.value && sessionIdInput.value !== '0' && sessionIdInput.value.trim() !== '') {
+            sendSessionIdToParent(sessionIdInput.value);
+        }
+
+        const observer = new MutationObserver((mutationsList, obs) => {
+            for (const mutation of mutationsList) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+                    const newSessionId = sessionIdInput.value;
+                    // 确保它是一个有意义的 ID，而不是初始的 "0" 或空值
+                    if (newSessionId && newSessionId !== '0' && newSessionId.trim() !== '') {
+                        sendSessionIdToParent(newSessionId);
+                        // 可选：如果会话 ID 设置一次后不再更改，则断开观察者
+                        // obs.disconnect();
+                    }
+                }
+            }
+        });
+
+        observer.observe(sessionIdInput, { attributes: true });
+
+        // 默认自动开始连接
+        if (typeof showRtcWarningAndStart === 'function') {
+            console.log('[webrtcchat.html] DOMContentLoaded, attempting to auto-start WebRTC connection...');
+            showRtcWarningAndStart();
+        } else if (typeof start === 'function') { // Fallback
+            console.log('[webrtcchat.html] DOMContentLoaded, attempting to auto-start WebRTC connection (fallback start())...');
+            start();
+        } else {
+            console.error('[webrtcchat.html] Auto-start failed: start function not found.');
+        }
+    });
 </script>
 </html>

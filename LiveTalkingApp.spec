@@ -1,0 +1,73 @@
+# -*- mode: python ; coding: utf-8 -*-
+
+
+a = Analysis(
+    ['setting_api.py'],
+    pathex=[],
+    binaries=[],
+    datas=[
+        ('web', 'web'),
+        ('assets', 'assets'),
+        ('models', 'models'),
+        ('data', 'data'),
+        ('setting_data.db', '.'),
+        ('app.py', '.'),
+        ('wav2lip', 'wav2lip'),
+        ('ultralight', 'ultralight'),
+        ('musetalk', 'musetalk'),
+        ('logger.py', '.'),
+        ('llm.py', '.'),
+        ('ttsreal.py', '.'),
+        ('proxy_server.py', '.'),
+        ('webrtc.py', '.'),
+        ('main.py', '.'),
+        ('lipreal.py', '.'),
+        ('lipasr.py', '.'),
+        ('baseasr.py', '.'),
+        ('cuda_test.py', '.'),
+        ('lightreal.py', '.'),
+        ('basereal.py', '.'),
+        ('hubertasr.py', '.'),
+        ('nerfreal.py', '.'),
+        ('musereal.py', '.'),
+        ('museasr.py', '.'),
+        ('nerfasr.py', '.'),
+        ('uploads', 'uploads'),
+        ('draft', 'draft')
+    ],
+    hiddenimports=[],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+    optimize=0,
+)
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='LiveTalkingApp',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='LiveTalkingApp',
+)

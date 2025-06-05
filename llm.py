@@ -1,10 +1,40 @@
 import time
 import os
+import sqlite3
 from basereal import BaseReal
 from logger import logger
 import dotenv
 
 dotenv.load_dotenv()
+
+# 定义数据库路径 (相对于 llm.py 文件或者使用绝对路径)
+# 假设 llm.py 和 setting_api.py 在同一目录下，或者 setting_data.db 在项目根目录
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "setting_data.db") # 确保路径正确
+
+def get_role_config_from_db():
+    """从数据库获取角色配置"""
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT role_name, preset_prompt, script_library_text FROM role_configurations WHERE id = 1")
+        row = c.fetchone()
+        if row:
+            return {
+                "role_name": row[0],
+                "preset_prompt": row[1],
+                "script_library_text": row[2]
+            }
+        else:
+            logger.warning("数据库中未找到角色配置 (id=1)")
+            return None
+    except sqlite3.Error as e:
+        logger.error(f"从数据库读取角色配置失败: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
 
 def llm_response(message,nerfreal:BaseReal):
     start = time.perf_counter()
@@ -17,28 +47,33 @@ def llm_response(message,nerfreal:BaseReal):
     )
     end = time.perf_counter()
     logger.info(f"llm Time init: {end-start}s")
+
+    # 获取角色配置
+    role_config = get_role_config_from_db()
+
+    system_prompt_content = """
+你是一位专业的AI助手。
+回应要求：
+1. 语气要友好、乐于助人。
+2. 保持专业性和可信度。
+3. 回答尽量简洁明了。
+""" # 默认后备提示
+
+    if role_config:
+        role_name = role_config.get("role_name", "AI助手")
+        preset_prompt_text = role_config.get("preset_prompt", "")
+        script_library = role_config.get("script_library_text", "")
+
+        system_prompt_content = f"你是名叫 \"{role_name}\" 的直播助手。\n{preset_prompt_text}"
+        if script_library:
+            system_prompt_content += f"\n\n你可以参考以下话术内容：\n---\n{script_library}\n---"
+        logger.info(f"使用数据库中的角色配置: {role_name}")
+    else:
+        logger.warning("无法从数据库加载角色配置，使用默认系统提示。")
+
     completion = client.chat.completions.create(
         model="gpt-4o",
-        messages=[{'role': 'system', 'content': '''你是一位专业的美妆带货主播，名叫"小美"。你正在直播带货，需要实时回应直播间观众的弹幕评论。
-
-你的特点：
-1. 性格活泼开朗，说话富有感染力
-2. 对产品非常了解，能详细讲解产品功效和使用方法
-3. 善于与观众互动，及时回应弹幕问题
-4. 经常使用"宝宝们"、"亲们"等亲切称呼
-5. 会适时使用"限时优惠"、"库存紧张"等营销话术
-6. 对负面评论也能巧妙化解，保持积极态度
-
-回应要求：
-1. 语气要热情洋溢，富有感染力
-2. 适时加入表情符号增加亲和力
-3. 突出产品优势，强调性价比
-4. 及时解答观众疑问
-5. 适时引导下单，但不过分强硬
-6. 保持专业性和可信度
-7. 不要太长，不超过50字
-
-记住：你是在直播带货，要让观众感受到你的专业和热情，同时也要保持真实可信。'''},
+        messages=[{'role': 'system', 'content': system_prompt_content},
                   {'role': 'user', 'content': message}],
         stream=True,
         # 通过以下设置，在流式输出的最后一行展示token使用信息
@@ -54,6 +89,8 @@ def llm_response(message,nerfreal:BaseReal):
                 logger.info(f"llm Time to first chunk: {end-start}s")
                 first = False
             msg = chunk.choices[0].delta.content
+            if msg is None:
+                msg = "" # 如果LLM返回的增量内容是None，则视为空字符串
             lastpos=0
             #msglist = re.split('[,.!;:，。！?]',msg)
             for i, char in enumerate(msg):
